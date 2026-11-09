@@ -9,6 +9,8 @@ import { PinLockModal } from "@/components/PinLockModal";
 import { AudioRecorder } from "@/components/AudioRecorder";
 import { AttachmentsPanel } from "@/components/AttachmentsPanel";
 import { ShareModal } from "@/components/ShareModal";
+import { useAuthStore } from "@/store/authStore";
+import { useSecureSessionStore } from "@/store/secureSessionStore";
 
 const COLORS = [null, "#FEF3C7", "#DBEAFE", "#DCFCE7", "#FCE7F3", "#EDE9FE"];
 
@@ -51,6 +53,9 @@ export default function NotePage() {
   // locally-typed state is the source of truth until the user navigates to
   // a genuinely different note.
   const loadedNoteIdRef = useRef<string | null>(null);
+  const user = useAuthStore((s) => s.user);
+  const verifiedPin = useSecureSessionStore((s) => s.verifiedPin);
+  const setVerifiedPin = useSecureSessionStore((s) => s.setVerifiedPin);
 
   useEffect(() => {
     if (note && loadedNoteIdRef.current !== note.id) {
@@ -61,13 +66,29 @@ export default function NotePage() {
       setIsProtected(note.isProtected);
       setAttachments(note.attachments ?? []);
       if (note.isProtected && note.locked) {
-        setUnlocked(false);
-        setShowLockModal("unlock");
+        // The whole point of a central lock: if this session already
+        // verified the security PIN for some other note, reuse it here
+        // silently instead of prompting again.
+        if (verifiedPin) {
+          api
+            .post(`/notes/${note.id}/unlock`, { pin: verifiedPin })
+            .then(() => {
+              setUnlocked(true);
+              qc.invalidateQueries({ queryKey: ["note", note.id] });
+            })
+            .catch(() => {
+              setUnlocked(false);
+              setShowLockModal("unlock");
+            });
+        } else {
+          setUnlocked(false);
+          setShowLockModal("unlock");
+        }
       } else {
         setUnlocked(true);
       }
     }
-  }, [note]);
+  }, [note, verifiedPin, qc]);
 
   async function ensureNoteCreated(): Promise<string> {
     if (noteId) return noteId;
@@ -111,6 +132,7 @@ export default function NotePage() {
   async function handleUnlock(pin: string) {
     try {
       await api.post(`/notes/${id}/unlock`, { pin });
+      setVerifiedPin(pin);
       setShowLockModal(null);
       setUnlocked(true);
       qc.invalidateQueries({ queryKey: ["note", id] });
@@ -119,17 +141,22 @@ export default function NotePage() {
     }
   }
 
-  async function handleSetLock(pin: string) {
+  // Locking a note is just "add it to the Secure section" — there's no
+  // per-note PIN to type, that's the whole point of the central lock. The
+  // one-time exception is a user who hasn't set a security PIN yet.
+  async function handleToggleLock() {
     const nid = await ensureNoteCreated();
-    await api.post(`/notes/${nid}/lock`, { pin });
+    if (isProtected) {
+      await api.delete(`/notes/${nid}/lock`);
+      setIsProtected(false);
+      return;
+    }
+    if (!user?.hasSecurityPin) {
+      navigate("/settings");
+      return;
+    }
+    await api.post(`/notes/${nid}/lock`);
     setIsProtected(true);
-    setShowLockModal(null);
-  }
-
-  async function handleRemoveLock() {
-    if (!noteId) return;
-    await api.delete(`/notes/${noteId}/lock`);
-    setIsProtected(false);
   }
 
   async function shareViaDevice() {
@@ -173,11 +200,11 @@ export default function NotePage() {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex items-center justify-between px-6 py-3 border-b" style={{ borderColor: "var(--color-border)" }}>
-        <button onClick={() => navigate(-1)} className="flex items-center gap-1 text-sm" style={{ color: "var(--color-text-muted)" }}>
+      <div className="flex items-center gap-3 px-4 sm:px-6 py-3 border-b overflow-x-auto" style={{ borderColor: "var(--color-border)" }}>
+        <button onClick={() => navigate(-1)} className="flex items-center gap-1 text-sm shrink-0" style={{ color: "var(--color-text-muted)" }}>
           <ArrowLeft size={16} /> Back
         </button>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 ml-auto shrink-0">
           {!isOwner && (
             <span className="text-xs px-2 py-1 rounded-full" style={{ backgroundColor: "var(--color-hover)", color: "var(--color-text-muted)" }}>
               {canWrite ? "Can edit" : "View only"} · shared with you
@@ -208,18 +235,18 @@ export default function NotePage() {
             </button>
           )}
           {isOwner && (isProtected ? (
-            <button onClick={handleRemoveLock} className="flex items-center gap-1 text-sm px-2 py-1.5 rounded-lg hover-surface">
-              <Unlock size={14} /> Remove lock
+            <button onClick={handleToggleLock} className="flex items-center gap-1 text-sm px-2 py-1.5 rounded-lg hover-surface">
+              <Unlock size={14} /> Remove from Secure
             </button>
           ) : (
-            <button onClick={() => setShowLockModal("set")} className="flex items-center gap-1 text-sm px-2 py-1.5 rounded-lg hover-surface">
-              <Lock size={14} /> Lock note
+            <button onClick={handleToggleLock} title={user?.hasSecurityPin ? undefined : "Set a security PIN first"} className="flex items-center gap-1 text-sm px-2 py-1.5 rounded-lg hover-surface">
+              <Lock size={14} /> Add to Secure
             </button>
           ))}
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-8 py-6 max-w-3xl mx-auto w-full" style={{ backgroundColor: color ?? "transparent" }}>
+      <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-4 sm:py-6 max-w-3xl mx-auto w-full" style={{ backgroundColor: color ?? "transparent" }}>
         <input
           value={title}
           disabled={!canWrite}
@@ -238,9 +265,6 @@ export default function NotePage() {
         <AttachmentsPanel attachments={attachments} />
       </div>
 
-      {showLockModal === "set" && (
-        <PinLockModal mode="set" onSubmit={handleSetLock} onCancel={() => setShowLockModal(null)} />
-      )}
       {showShareModal && noteId && <ShareModal noteId={noteId} onClose={() => setShowShareModal(false)} />}
     </div>
   );

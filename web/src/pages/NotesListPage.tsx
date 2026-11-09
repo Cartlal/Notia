@@ -11,6 +11,7 @@ const viewTitles: Record<string, string> = {
   archived: "Archive",
   trash: "Trash",
   shared: "Shared with me",
+  locked: "Secure",
 };
 
 export default function NotesListPage({ view = "all" }: { view?: string }) {

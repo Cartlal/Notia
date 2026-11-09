@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Lock } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
+import { useSecureSessionStore } from "@/store/secureSessionStore";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -35,6 +36,13 @@ export default function SettingsPage() {
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [deleting, setDeleting] = useState(false);
 
+  const setVerifiedPin = useSecureSessionStore((s) => s.setVerifiedPin);
+  const [currentSecurityPin, setCurrentSecurityPin] = useState("");
+  const [newSecurityPin, setNewSecurityPin] = useState("");
+  const [securityPinError, setSecurityPinError] = useState<string | null>(null);
+  const [securityPinSaved, setSecurityPinSaved] = useState(false);
+  const [savingSecurityPin, setSavingSecurityPin] = useState(false);
+
   async function saveName(e: React.FormEvent) {
     e.preventDefault();
     setSavingName(true);
@@ -62,6 +70,28 @@ export default function SettingsPage() {
       setPasswordError(err.response?.data?.message ?? "Couldn't change your password");
     } finally {
       setSavingPassword(false);
+    }
+  }
+
+  async function saveSecurityPin(e: React.FormEvent) {
+    e.preventDefault();
+    setSecurityPinError(null);
+    setSecurityPinSaved(false);
+    setSavingSecurityPin(true);
+    try {
+      if (user?.hasSecurityPin) {
+        await api.post("/auth/security-pin/verify", { pin: currentSecurityPin });
+      }
+      await api.post("/auth/security-pin", { pin: newSecurityPin });
+      setUser({ ...user!, hasSecurityPin: true });
+      setVerifiedPin(newSecurityPin);
+      setCurrentSecurityPin("");
+      setNewSecurityPin("");
+      setSecurityPinSaved(true);
+    } catch (err: any) {
+      setSecurityPinError(err.response?.data?.message ?? "Couldn't set the security PIN");
+    } finally {
+      setSavingSecurityPin(false);
     }
   }
 
@@ -119,6 +149,32 @@ export default function SettingsPage() {
                 {savingPassword ? "Updating…" : "Update password"}
               </button>
               {passwordSaved && <span className="text-sm text-green-600">Password updated</span>}
+            </div>
+          </form>
+        </section>
+
+        <section className="mb-10">
+          <h2 className="text-sm font-semibold uppercase mb-1 flex items-center gap-1.5" style={{ color: "var(--color-text-muted)" }}>
+            <Lock size={14} /> Security PIN
+          </h2>
+          <p className="text-xs mb-3" style={{ color: "var(--color-text-muted)" }}>
+            One PIN protects every note you lock — set it once here, then "Lock note" on any note just adds it to your Secure section.
+          </p>
+          <form onSubmit={saveSecurityPin} className="note-card rounded-xl p-4">
+            {user?.hasSecurityPin && (
+              <Field label="Current PIN">
+                <input type="password" required inputMode="numeric" minLength={4} maxLength={12} value={currentSecurityPin} onChange={(e) => setCurrentSecurityPin(e.target.value)} className={inputClass} style={inputStyle} />
+              </Field>
+            )}
+            <Field label={user?.hasSecurityPin ? "New PIN" : "Set a PIN (4–12 digits)"}>
+              <input type="password" required inputMode="numeric" minLength={4} maxLength={12} value={newSecurityPin} onChange={(e) => setNewSecurityPin(e.target.value)} className={inputClass} style={inputStyle} />
+            </Field>
+            {securityPinError && <p className="text-sm text-red-500 mb-3">{securityPinError}</p>}
+            <div className="flex items-center gap-3">
+              <button type="submit" disabled={savingSecurityPin} className="rounded-lg bg-brand-600 text-white px-4 py-2 text-sm font-medium hover:bg-brand-700 disabled:opacity-60">
+                {savingSecurityPin ? "Saving…" : user?.hasSecurityPin ? "Update PIN" : "Set PIN"}
+              </button>
+              {securityPinSaved && <span className="text-sm text-green-600">Saved</span>}
             </div>
           </form>
         </section>

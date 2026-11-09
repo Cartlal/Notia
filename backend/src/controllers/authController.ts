@@ -30,8 +30,14 @@ const refreshCookieOptions = {
   maxAge: 30 * 24 * 60 * 60 * 1000,
 };
 
-function toSafeUser(user: { id: string; email: string; name: string; avatarUrl: string | null }) {
-  return { id: user.id, email: user.email, name: user.name, avatarUrl: user.avatarUrl };
+function toSafeUser(user: { id: string; email: string; name: string; avatarUrl: string | null; securityPinHash?: string | null }) {
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    avatarUrl: user.avatarUrl,
+    hasSecurityPin: Boolean(user.securityPinHash),
+  };
 }
 
 // Web authenticates via the httpOnly refresh cookie; mobile has no reliable
@@ -135,6 +141,24 @@ export async function updateProfile(req: AuthedRequest, res: Response) {
   const body = updateProfileSchema.parse(req.body);
   const user = await prisma.user.update({ where: { id: req.userId! }, data: { name: body.name } });
   res.json({ user: toSafeUser(user) });
+}
+
+const securityPinSchema = z.object({ pin: z.string().min(4).max(12) });
+
+export async function setSecurityPin(req: AuthedRequest, res: Response) {
+  const { pin } = securityPinSchema.parse(req.body);
+  const securityPinHash = await bcrypt.hash(pin, 10);
+  await prisma.user.update({ where: { id: req.userId! }, data: { securityPinHash } });
+  res.status(204).send();
+}
+
+export async function verifySecurityPin(req: AuthedRequest, res: Response) {
+  const { pin } = securityPinSchema.parse(req.body);
+  const user = await prisma.user.findUnique({ where: { id: req.userId! } });
+  if (!user?.securityPinHash) throw new ApiError(409, "no_security_pin", "No security PIN set yet");
+  const valid = await bcrypt.compare(pin, user.securityPinHash);
+  if (!valid) throw new ApiError(401, "invalid_pin", "Incorrect PIN");
+  res.status(204).send();
 }
 
 const changePasswordSchema = z.object({

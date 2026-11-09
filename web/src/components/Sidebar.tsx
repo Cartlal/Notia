@@ -1,9 +1,10 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { Home, Star, Pin, Archive, Trash2, Folder as FolderIcon, Tag as TagIcon, Plus, LogOut, Sun, Moon, Users, Settings } from "lucide-react";
+import { Home, Star, Pin, Archive, Trash2, Folder as FolderIcon, Tag as TagIcon, Plus, LogOut, Sun, Moon, Users, Settings, ShieldCheck } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { useFolders, useTags } from "@/hooks/useNotes";
 import { useAuthStore } from "@/store/authStore";
 import { useThemeStore } from "@/store/themeStore";
+import { useSecureSessionStore } from "@/store/secureSessionStore";
 import { api } from "@/lib/api";
 
 const navItems = [
@@ -11,6 +12,7 @@ const navItems = [
   { to: "/favorites", icon: Star, label: "Favorites" },
   { to: "/pinned", icon: Pin, label: "Pinned" },
   { to: "/shared", icon: Users, label: "Shared with me" },
+  { to: "/secure", icon: ShieldCheck, label: "Secure" },
   { to: "/archived", icon: Archive, label: "Archive" },
   { to: "/trash", icon: Trash2, label: "Trash" },
 ];
@@ -21,11 +23,13 @@ export function Sidebar() {
   const { data: tags = [] } = useTags();
   const user = useAuthStore((s) => s.user);
   const clear = useAuthStore((s) => s.clear);
+  const clearSecureSession = useSecureSessionStore((s) => s.clear);
   const { theme, setTheme } = useThemeStore();
 
   async function logout() {
     await api.post("/auth/logout");
     clear();
+    clearSecureSession();
     navigate("/login");
   }
 

@@ -40,6 +40,19 @@ function serializeNote(note: any) {
   return { ...rest, tags: noteTags?.map((nt: any) => nt.tag) ?? [], pinHash: undefined };
 }
 
+// Used for list endpoints: a protected note's body never goes out in a list
+// response, central-PIN-verified or not — only opening the note individually
+// (which requires the PIN) reveals content. Without this, content for every
+// note in the new "Secure" view (and any protected note mixed into "All
+// notes") would leak in the network response even though the UI hides it.
+function serializeNoteRedacted(note: any) {
+  const serialized = serializeNote(note);
+  if (note.isProtected) {
+    return { ...serialized, content: null, contentJson: null, plainText: "" };
+  }
+  return serialized;
+}
+
 async function getOwnedNote(userId: string, noteId: string) {
   const note = await prisma.note.findFirst({ where: { id: noteId, userId }, include: noteInclude });
   if (!note) throw new ApiError(404, "note_not_found", "Note not found");
@@ -61,7 +74,7 @@ export async function listNotes(req: AuthedRequest, res: Response) {
       include: noteInclude,
       orderBy: { updatedAt: "desc" },
     });
-    return res.json({ notes: notes.map(serializeNote) });
+    return res.json({ notes: notes.map(serializeNoteRedacted) });
   }
 
   const where: any = { userId: req.userId! };
@@ -71,6 +84,7 @@ export async function listNotes(req: AuthedRequest, res: Response) {
     if (view === "archived") where.isArchived = true;
     else if (view === "favorites") where.isFavorite = true;
     else if (view === "pinned") where.isPinned = true;
+    else if (view === "locked") where.isProtected = true;
     else where.isArchived = false;
   }
   if (folderId) where.folderId = folderId;
@@ -79,7 +93,7 @@ export async function listNotes(req: AuthedRequest, res: Response) {
   const orderBy: any = { [sort]: order === "asc" ? "asc" : "desc" };
 
   const notes = await prisma.note.findMany({ where, include: noteInclude, orderBy });
-  res.json({ notes: notes.map(serializeNote) });
+  res.json({ notes: notes.map(serializeNoteRedacted) });
 }
 
 export async function getNote(req: AuthedRequest, res: Response) {
@@ -192,25 +206,33 @@ export async function duplicateNote(req: AuthedRequest, res: Response) {
 
 const pinSchema = z.object({ pin: z.string().min(4).max(12) });
 
+// Notes are protected by ONE central "security PIN" on the User, not a
+// separate PIN per note (Note.pinHash is unused/legacy) — unlocking the
+// Secure section once covers every note in it, matching the web/Flutter
+// "central lock" UX.
 export async function setNoteLock(req: AuthedRequest, res: Response) {
   const existing = await getOwnedNote(req.userId!, req.params.id);
-  const { pin } = pinSchema.parse(req.body);
-  const pinHash = await bcrypt.hash(pin, 10);
-  const note = await prisma.note.update({ where: { id: existing.id }, data: { isProtected: true, pinHash } });
+  const user = await prisma.user.findUnique({ where: { id: req.userId! } });
+  if (!user?.securityPinHash) {
+    throw new ApiError(409, "no_security_pin", "Set a security PIN first (Settings → Security)");
+  }
+  const note = await prisma.note.update({ where: { id: existing.id }, data: { isProtected: true } });
   res.json({ note: serializeNote(note) });
 }
 
 export async function removeNoteLock(req: AuthedRequest, res: Response) {
   const existing = await getOwnedNote(req.userId!, req.params.id);
-  const note = await prisma.note.update({ where: { id: existing.id }, data: { isProtected: false, pinHash: null } });
+  const note = await prisma.note.update({ where: { id: existing.id }, data: { isProtected: false } });
   res.json({ note: serializeNote(note) });
 }
 
 export async function unlockNote(req: AuthedRequest, res: Response) {
   const existing = await getOwnedNote(req.userId!, req.params.id);
-  if (!existing.isProtected || !existing.pinHash) return res.json({ note: serializeNote(existing) });
+  if (!existing.isProtected) return res.json({ note: serializeNote(existing) });
+  const user = await prisma.user.findUnique({ where: { id: req.userId! } });
+  if (!user?.securityPinHash) return res.json({ note: serializeNote(existing) });
   const { pin } = pinSchema.parse(req.body);
-  const valid = await bcrypt.compare(pin, existing.pinHash);
+  const valid = await bcrypt.compare(pin, user.securityPinHash);
   if (!valid) throw new ApiError(401, "invalid_pin", "Incorrect PIN");
   res.json({ note: serializeNote(existing) });
 }

@@ -1,30 +1,78 @@
 import { useNavigate } from "react-router-dom";
-import { Pin, Star, Archive, Trash2, Lock, Copy, Users } from "lucide-react";
+import { useRef, useState } from "react";
+import { Pin, Star, Archive, Trash2, Lock, Copy, Users, MoreVertical, RotateCcw, XCircle } from "lucide-react";
 import type { Note } from "@/lib/types";
 import { useNoteMutations } from "@/hooks/useNotes";
 import { useAuthStore } from "@/store/authStore";
 
+const LONG_PRESS_MS = 450;
+
 export function NoteCard({ note }: { note: Note }) {
   const navigate = useNavigate();
-  const { pin, favorite, archive, trash, duplicate } = useNoteMutations();
+  const { pin, favorite, archive, trash, duplicate, restore, remove } = useNoteMutations();
   const currentUserId = useAuthStore((s) => s.user?.id);
   const isOwner = note.userId === currentUserId;
+  const [menuOpen, setMenuOpen] = useState(false);
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const suppressClick = useRef(false);
 
   const plain = (note.content ?? "").replace(/<[^>]+>/g, " ").slice(0, 160);
   const image = note.attachments.find((a) => a.kind === "image");
 
+  function startPress() {
+    if (!isOwner) return;
+    pressTimer.current = setTimeout(() => {
+      suppressClick.current = true;
+      setMenuOpen(true);
+    }, LONG_PRESS_MS);
+  }
+  function endPress() {
+    clearTimeout(pressTimer.current);
+  }
+
+  function openNote() {
+    if (suppressClick.current) {
+      suppressClick.current = false;
+      return;
+    }
+    navigate(`/notes/${note.id}`);
+  }
+
+  function act(fn: () => void) {
+    return () => {
+      fn();
+      setMenuOpen(false);
+    };
+  }
+
   return (
     <div
-      onClick={() => navigate(`/notes/${note.id}`)}
-      className="note-card group relative flex flex-col rounded-xl p-4 cursor-pointer transition-shadow hover:shadow-md"
+      onClick={openNote}
+      onTouchStart={startPress}
+      onTouchEnd={endPress}
+      onTouchMove={endPress}
+      onMouseDown={startPress}
+      onMouseUp={endPress}
+      onMouseLeave={endPress}
+      onContextMenu={(e) => { if (isOwner) { e.preventDefault(); setMenuOpen(true); } }}
+      className="note-card group relative flex flex-col rounded-xl p-4 cursor-pointer transition-shadow hover:shadow-md select-none"
       style={{ backgroundColor: note.color ?? "var(--color-surface)" }}
     >
       {image && <img src={image.url} alt="" className="mb-3 h-28 w-full rounded-lg object-cover" />}
-      <div className="flex items-center justify-between mb-1">
-        <h3 className="font-medium truncate">{note.title || "Untitled"}</h3>
+      <div className="flex items-center justify-between mb-1 gap-2">
+        <h3 className="font-medium truncate flex-1">{note.title || "Untitled"}</h3>
         <div className="flex items-center gap-1 shrink-0">
           {!isOwner && <Users size={14} style={{ color: "var(--color-text-muted)" }} />}
           {note.isProtected && <Lock size={14} style={{ color: "var(--color-text-muted)" }} />}
+          {isOwner && (
+            <button
+              title="More actions"
+              onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v); }}
+              className="p-1 rounded hover-surface"
+            >
+              <MoreVertical size={16} />
+            </button>
+          )}
         </div>
       </div>
       <p className="text-sm line-clamp-3" style={{ color: "var(--color-text-muted)" }}>
@@ -37,29 +85,54 @@ export function NoteCard({ note }: { note: Note }) {
         ))}
       </div>
 
-      {isOwner && (
-        <div
-          className="absolute top-2 right-2 hidden group-hover:flex items-center gap-1 rounded-lg p-1 shadow-sm"
-          style={{ backgroundColor: "var(--color-surface)" }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button title="Pin" onClick={() => pin.mutate(note.id)} className="p-1.5 rounded hover-surface">
-            <Pin size={14} fill={note.isPinned ? "currentColor" : "none"} />
-          </button>
-          <button title="Favorite" onClick={() => favorite.mutate(note.id)} className="p-1.5 rounded hover-surface">
-            <Star size={14} fill={note.isFavorite ? "currentColor" : "none"} />
-          </button>
-          <button title="Duplicate" onClick={() => duplicate.mutate(note.id)} className="p-1.5 rounded hover-surface">
-            <Copy size={14} />
-          </button>
-          <button title="Archive" onClick={() => archive.mutate(note.id)} className="p-1.5 rounded hover-surface">
-            <Archive size={14} />
-          </button>
-          <button title="Trash" onClick={() => trash.mutate(note.id)} className="p-1.5 rounded hover-surface text-red-500">
-            <Trash2 size={14} />
-          </button>
-        </div>
+      {menuOpen && (
+        <>
+          {/* Full-screen backdrop: click anywhere outside the menu to close it. */}
+          <div className="fixed inset-0 z-10" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); }} />
+          <div
+            className="absolute top-10 right-2 z-20 flex flex-col rounded-lg shadow-lg border min-w-[160px] py-1 note-card"
+            style={{ borderColor: "var(--color-border)" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {note.isTrashed ? (
+              <>
+                <MenuItem icon={RotateCcw} label="Restore" onClick={act(() => restore.mutate(note.id))} />
+                <MenuItem icon={XCircle} label="Delete permanently" danger onClick={act(() => remove.mutate(note.id))} />
+              </>
+            ) : (
+              <>
+                <MenuItem icon={Pin} label={note.isPinned ? "Unpin" : "Pin"} onClick={act(() => pin.mutate(note.id))} />
+                <MenuItem icon={Star} label={note.isFavorite ? "Unfavorite" : "Favorite"} onClick={act(() => favorite.mutate(note.id))} />
+                <MenuItem icon={Copy} label="Duplicate" onClick={act(() => duplicate.mutate(note.id))} />
+                <MenuItem icon={Archive} label={note.isArchived ? "Unarchive" : "Archive"} onClick={act(() => archive.mutate(note.id))} />
+                <MenuItem icon={Trash2} label="Move to trash" danger onClick={act(() => trash.mutate(note.id))} />
+              </>
+            )}
+          </div>
+        </>
       )}
     </div>
+  );
+}
+
+function MenuItem({
+  icon: Icon,
+  label,
+  onClick,
+  danger,
+}: {
+  icon: typeof Pin;
+  label: string;
+  onClick: () => void;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center gap-2 px-3 py-2 text-sm text-left hover-surface"
+      style={danger ? { color: "#DC2626" } : undefined}
+    >
+      <Icon size={14} /> {label}
+    </button>
   );
 }
