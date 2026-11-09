@@ -10,7 +10,7 @@ import '../models/note.dart';
 import '../providers/providers.dart';
 import '../theme/app_theme.dart';
 import '../widgets/collaborators_dialog.dart';
-import '../widgets/pin_dialog.dart';
+import '../widgets/pin_dialog.dart' show showPasswordDialog;
 import '../widgets/quill_note_editor.dart';
 
 const _kNoteColors = <Color?>[null, Color(0xFFFEF3C7), Color(0xFFDBEAFE), Color(0xFFDCFCE7), Color(0xFFFCE7F3), Color(0xFFEDE9FE)];
@@ -91,27 +91,27 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     final lock = ref.read(lockServiceProvider);
     final notes = ref.read(notesServiceProvider);
 
-    // Central lock: a PIN already verified elsewhere this session (or on
-    // an earlier app run) unlocks this note too via one fingerprint touch
-    // — no per-note re-entry.
-    final cachedPin = await lock.tryBiometricUnlock();
-    if (cachedPin != null && await notes.verifyLock(_noteId!, cachedPin)) {
+    // Central lock: the account password, already verified elsewhere this
+    // session (or on an earlier app run), unlocks this note too via one
+    // fingerprint/system-PIN touch — no re-typing it per note.
+    final cachedPassword = await lock.tryDeviceUnlock();
+    if (cachedPassword != null && await notes.verifyLock(_noteId!, cachedPassword)) {
       _fillFields(_note!);
       return;
     }
 
     if (!mounted) return;
-    final pin = await showPinDialog(context, title: 'Enter security PIN', message: 'This note is in your Secure section.');
-    if (pin == null) {
+    final password = await showPasswordDialog(context, title: 'Enter your password', message: 'This note is in your Secure section.');
+    if (password == null) {
       if (mounted) Navigator.of(context).pop();
       return;
     }
-    final ok = await lock.verifyAndStorePin(pin) && await notes.verifyLock(_noteId!, pin);
+    final ok = await lock.verifyAndStorePassword(password) && await notes.verifyLock(_noteId!, password);
     if (!mounted) return;
     if (ok) {
       _fillFields(_note!);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Incorrect PIN')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Incorrect password')));
       Navigator.of(context).pop();
     }
   }
@@ -172,9 +172,9 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     setState(() => _attachments = [..._attachments, attachment]);
   }
 
-  // Locking a note just adds it to the Secure section — no PIN to type
-  // here, since one security PIN already covers every note in it. The
-  // one exception is the very first time: nothing to lock with yet.
+  // Locking a note just adds it to the Secure section — gated by the
+  // account password, so nothing to type here. The only case this can't
+  // work is a Google-only account with no password at all.
   Future<void> _toggleLock() async {
     final id = await _ensureCreated();
     final notes = ref.read(notesServiceProvider);
@@ -184,10 +184,10 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       return;
     }
     final user = ref.read(authControllerProvider).valueOrNull;
-    if (user?.hasSecurityPin != true) {
+    if (user?.hasPassword != true) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Set a security PIN first, in Profile & settings')),
+        const SnackBar(content: Text('This account signs in with Google and has no password to protect notes with')),
       );
       return;
     }

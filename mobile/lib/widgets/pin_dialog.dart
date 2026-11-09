@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
-/// Returns the entered PIN, or null if the user cancelled.
-Future<String?> showPinDialog(BuildContext context, {required String title, required String message}) {
+/// Prompts for the account password (used to unlock the Secure section).
+/// Returns the entered password, or null if the user cancelled.
+Future<String?> showPasswordDialog(BuildContext context, {required String title, required String message}) {
   final controller = TextEditingController();
   return showDialog<String>(
     context: context,
@@ -18,9 +19,7 @@ Future<String?> showPinDialog(BuildContext context, {required String title, requ
             controller: controller,
             autofocus: true,
             obscureText: true,
-            keyboardType: TextInputType.number,
-            maxLength: 12,
-            decoration: const InputDecoration(labelText: 'PIN', counterText: ''),
+            decoration: const InputDecoration(labelText: 'Account password'),
           ),
         ],
       ),

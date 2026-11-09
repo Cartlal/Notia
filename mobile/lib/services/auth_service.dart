@@ -4,15 +4,15 @@ class AuthUser {
   final String id;
   final String email;
   final String name;
-  final bool hasSecurityPin;
+  final bool hasPassword;
 
-  AuthUser({required this.id, required this.email, required this.name, required this.hasSecurityPin});
+  AuthUser({required this.id, required this.email, required this.name, required this.hasPassword});
 
   factory AuthUser.fromJson(Map<String, dynamic> json) => AuthUser(
         id: json['id'],
         email: json['email'],
         name: json['name'],
-        hasSecurityPin: json['hasSecurityPin'] ?? false,
+        hasPassword: json['hasPassword'] ?? false,
       );
 }
 
@@ -68,11 +68,12 @@ class AuthService {
     await ApiClient.instance.clearTokens();
   }
 
-  Future<void> setSecurityPin(String pin) => _dio.post('/auth/security-pin', data: {'pin': pin});
-
-  Future<bool> verifySecurityPin(String pin) async {
+  // No separate security PIN — Secure notes are gated by this same account
+  // password, with the device's own fingerprint/system PIN as the local
+  // shortcut (see LockService) instead of a third secret to manage.
+  Future<bool> verifyPassword(String password) async {
     try {
-      await _dio.post('/auth/security-pin/verify', data: {'pin': pin});
+      await _dio.post('/auth/verify-password', data: {'password': password});
       return true;
     } catch (_) {
       return false;

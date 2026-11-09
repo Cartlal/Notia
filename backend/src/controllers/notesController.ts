@@ -204,17 +204,19 @@ export async function duplicateNote(req: AuthedRequest, res: Response) {
   res.status(201).json({ note: serializeNote(copy) });
 }
 
-const pinSchema = z.object({ pin: z.string().min(4).max(12) });
+const passwordSchema = z.object({ password: z.string().min(1) });
 
-// Notes are protected by ONE central "security PIN" on the User, not a
-// separate PIN per note (Note.pinHash is unused/legacy) — unlocking the
-// Secure section once covers every note in it, matching the web/Flutter
-// "central lock" UX.
+// Notes are protected by the user's own account password — no separate
+// PIN to create and remember. Unlocking any one protected note (or just
+// verifying via /auth/verify-password) covers every note in the Secure
+// section for the session, matching the web/Flutter "central lock" UX;
+// see mobile/lib/services/lock_service.dart for how the device's own
+// fingerprint/system PIN layers on top of that as a local shortcut.
 export async function setNoteLock(req: AuthedRequest, res: Response) {
   const existing = await getOwnedNote(req.userId!, req.params.id);
   const user = await prisma.user.findUnique({ where: { id: req.userId! } });
-  if (!user?.securityPinHash) {
-    throw new ApiError(409, "no_security_pin", "Set a security PIN first (Settings → Security)");
+  if (!user?.passwordHash) {
+    throw new ApiError(409, "no_password", "This account has no password to protect notes with (Google sign-in)");
   }
   const note = await prisma.note.update({ where: { id: existing.id }, data: { isProtected: true } });
   res.json({ note: serializeNote(note) });
@@ -230,9 +232,9 @@ export async function unlockNote(req: AuthedRequest, res: Response) {
   const existing = await getOwnedNote(req.userId!, req.params.id);
   if (!existing.isProtected) return res.json({ note: serializeNote(existing) });
   const user = await prisma.user.findUnique({ where: { id: req.userId! } });
-  if (!user?.securityPinHash) return res.json({ note: serializeNote(existing) });
-  const { pin } = pinSchema.parse(req.body);
-  const valid = await bcrypt.compare(pin, user.securityPinHash);
-  if (!valid) throw new ApiError(401, "invalid_pin", "Incorrect PIN");
+  if (!user?.passwordHash) return res.json({ note: serializeNote(existing) });
+  const { password } = passwordSchema.parse(req.body);
+  const valid = await bcrypt.compare(password, user.passwordHash);
+  if (!valid) throw new ApiError(401, "invalid_credentials", "Incorrect password");
   res.json({ note: serializeNote(existing) });
 }

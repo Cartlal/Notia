@@ -39,9 +39,6 @@ model User {
   passwordHash  String?
   name          String
   avatarUrl     String?
-  // A single PIN that gates every note in this user's "Secure" section —
-  // one central lock, not one per note. See docs/ARCHITECTURE.md.
-  securityPinHash String?
   authProvider  AuthProvider @default(LOCAL)
   googleId      String?      @unique
   createdAt     DateTime     @default(now())

@@ -36,14 +36,14 @@ class NotesService {
   Future<Note> trash(String id) async => Note.fromJson((await _dio.post('/notes/$id/trash')).data['note']);
   Future<Note> restore(String id) async => Note.fromJson((await _dio.post('/notes/$id/restore')).data['note']);
 
-  // No PIN in the request anymore: locking just adds the note to the
-  // central Secure section, gated by the user's one security PIN
-  // (set/changed in Profile) rather than a PIN per note.
+  // Locking just adds the note to the central Secure section, gated by
+  // the user's account password (see AuthService.verifyPassword) rather
+  // than a separate PIN — nothing to collect here.
   Future<void> setLock(String id) => _dio.post('/notes/$id/lock');
   Future<void> removeLock(String id) => _dio.delete('/notes/$id/lock');
-  Future<bool> verifyLock(String id, String pin) async {
+  Future<bool> verifyLock(String id, String password) async {
     try {
-      await _dio.post('/notes/$id/unlock', data: {'pin': pin});
+      await _dio.post('/notes/$id/unlock', data: {'password': password});
       return true;
     } on DioException {
       return false;

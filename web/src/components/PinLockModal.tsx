@@ -22,23 +22,18 @@ export function PinLockModal({
       >
         <div className="flex items-center gap-2 mb-3">
           <Lock size={18} className="text-brand-600" />
-          <h2 className="font-semibold">{mode === "set" ? "Set a PIN" : "Enter PIN"}</h2>
+          <h2 className="font-semibold">Enter your password</h2>
         </div>
         <p className="text-sm mb-4" style={{ color: "var(--color-text-muted)" }}>
-          {mode === "set"
-            ? "This PIN will be required to open this note (also usable with fingerprint unlock on the mobile app)."
-            : "This note is protected. Enter the PIN to continue."}
+          This note is protected. Enter your account password to continue — on mobile, a fingerprint or system PIN can be used instead once you've entered it there once.
         </p>
         <input
           autoFocus
           type="password"
-          inputMode="numeric"
-          minLength={4}
-          maxLength={12}
           required
           value={pin}
           onChange={(e) => setPin(e.target.value)}
-          placeholder="4–12 digit PIN"
+          placeholder="Account password"
           className="w-full rounded-lg border px-3 py-2 text-sm text-center tracking-widest outline-none focus:ring-2 focus:ring-brand-400 mb-2"
           style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-bg)" }}
         />

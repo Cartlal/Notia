@@ -54,8 +54,8 @@ export default function NotePage() {
   // a genuinely different note.
   const loadedNoteIdRef = useRef<string | null>(null);
   const user = useAuthStore((s) => s.user);
-  const verifiedPin = useSecureSessionStore((s) => s.verifiedPin);
-  const setVerifiedPin = useSecureSessionStore((s) => s.setVerifiedPin);
+  const verifiedPassword = useSecureSessionStore((s) => s.verifiedPin);
+  const setVerifiedPassword = useSecureSessionStore((s) => s.setVerifiedPin);
 
   useEffect(() => {
     if (note && loadedNoteIdRef.current !== note.id) {
@@ -67,11 +67,11 @@ export default function NotePage() {
       setAttachments(note.attachments ?? []);
       if (note.isProtected && note.locked) {
         // The whole point of a central lock: if this session already
-        // verified the security PIN for some other note, reuse it here
-        // silently instead of prompting again.
-        if (verifiedPin) {
+        // verified the account password for some other note, reuse it
+        // here silently instead of prompting again.
+        if (verifiedPassword) {
           api
-            .post<{ note: Note }>(`/notes/${note.id}/unlock`, { pin: verifiedPin })
+            .post<{ note: Note }>(`/notes/${note.id}/unlock`, { password: verifiedPassword })
             .then(({ data }) => applyUnlockedNote(data.note))
             .catch(() => {
               setUnlocked(false);
@@ -85,7 +85,7 @@ export default function NotePage() {
         setUnlocked(true);
       }
     }
-  }, [note, verifiedPin, qc]);
+  }, [note, verifiedPassword, qc]);
 
   // The unlock endpoint's response already carries the real content (the
   // GET endpoint deliberately nulls it out for a locked note) — apply it
@@ -140,19 +140,20 @@ export default function NotePage() {
     return attachment.url;
   }
 
-  async function handleUnlock(pin: string) {
+  async function handleUnlock(password: string) {
     try {
-      const { data } = await api.post<{ note: Note }>(`/notes/${id}/unlock`, { pin });
-      setVerifiedPin(pin);
+      const { data } = await api.post<{ note: Note }>(`/notes/${id}/unlock`, { password });
+      setVerifiedPassword(password);
       applyUnlockedNote(data.note);
     } catch {
-      setLockError("Incorrect PIN");
+      setLockError("Incorrect password");
     }
   }
 
-  // Locking a note is just "add it to the Secure section" — there's no
-  // per-note PIN to type, that's the whole point of the central lock. The
-  // one-time exception is a user who hasn't set a security PIN yet.
+  // Locking a note is just "add it to the Secure section" — gated by the
+  // account password (no separate PIN to create), so nothing to prompt
+  // for here. The one case this can't work is a Google-only account with
+  // no password at all.
   async function handleToggleLock() {
     const nid = await ensureNoteCreated();
     if (isProtected) {
@@ -160,8 +161,8 @@ export default function NotePage() {
       setIsProtected(false);
       return;
     }
-    if (!user?.hasSecurityPin) {
-      navigate("/settings");
+    if (!user?.hasPassword) {
+      window.alert("This account signs in with Google and has no password to protect notes with.");
       return;
     }
     await api.post(`/notes/${nid}/lock`);
@@ -248,7 +249,7 @@ export default function NotePage() {
               <Unlock size={14} /> Remove from Secure
             </button>
           ) : (
-            <button onClick={handleToggleLock} title={user?.hasSecurityPin ? undefined : "Set a security PIN first"} className="flex items-center gap-1 text-sm px-2 py-1.5 rounded-lg hover-surface">
+            <button onClick={handleToggleLock} className="flex items-center gap-1 text-sm px-2 py-1.5 rounded-lg hover-surface">
               <Lock size={14} /> Add to Secure
             </button>
           ))}

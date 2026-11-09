@@ -17,7 +17,6 @@ router.get("/me", requireAuth, asyncHandler(auth.me));
 router.patch("/me", requireAuth, asyncHandler(auth.updateProfile));
 router.delete("/me", requireAuth, asyncHandler(auth.deleteAccount));
 router.post("/change-password", requireAuth, authLimiter, asyncHandler(auth.changePassword));
-router.post("/security-pin", requireAuth, asyncHandler(auth.setSecurityPin));
-router.post("/security-pin/verify", requireAuth, authLimiter, asyncHandler(auth.verifySecurityPin));
+router.post("/verify-password", requireAuth, authLimiter, asyncHandler(auth.verifyPassword));
 
 export default router;

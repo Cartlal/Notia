@@ -16,18 +16,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   final _currentPassword = TextEditingController();
   final _newPassword = TextEditingController();
   final _deleteConfirm = TextEditingController();
-  final _currentPin = TextEditingController();
-  final _newPin = TextEditingController();
 
   bool _savingName = false;
   bool _savingPassword = false;
-  bool _savingPin = false;
   bool _deleting = false;
   String? _passwordError;
-  String? _pinError;
   bool _nameSaved = false;
   bool _passwordSaved = false;
-  bool _pinSaved = false;
 
   @override
   void initState() {
@@ -42,8 +37,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     _currentPassword.dispose();
     _newPassword.dispose();
     _deleteConfirm.dispose();
-    _currentPin.dispose();
-    _newPin.dispose();
     super.dispose();
   }
 
@@ -68,6 +61,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             currentPassword: _currentPassword.text,
             newPassword: _newPassword.text,
           );
+      // The Secure section is gated by this same password — if a new
+      // password was just cached on-device for the fingerprint/system-PIN
+      // shortcut, the old cached copy is now stale and would fail the
+      // next device-auth unlock. Re-cache the new one (and reconfirm
+      // `hasPassword`, in case this was the first password this account
+      // ever had).
+      await ref.read(lockServiceProvider).verifyAndStorePassword(_newPassword.text);
+      await ref.read(authControllerProvider.notifier).refresh();
       _currentPassword.clear();
       _newPassword.clear();
       setState(() => _passwordSaved = true);
@@ -75,38 +76,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       setState(() => _passwordError = "Couldn't change your password");
     } finally {
       if (mounted) setState(() => _savingPassword = false);
-    }
-  }
-
-  Future<void> _saveSecurityPin() async {
-    setState(() {
-      _savingPin = true;
-      _pinError = null;
-      _pinSaved = false;
-    });
-    try {
-      final user = ref.read(authControllerProvider).valueOrNull;
-      final auth = ref.read(authServiceProvider);
-      if (user?.hasSecurityPin == true) {
-        final ok = await auth.verifySecurityPin(_currentPin.text);
-        if (!ok) {
-          setState(() => _pinError = 'Current PIN is incorrect');
-          return;
-        }
-      }
-      await auth.setSecurityPin(_newPin.text);
-      // Also stores it for this device's fingerprint shortcut — setting a
-      // new PIN re-verifies it against the server and caches it the same
-      // way typing it to unlock a note would.
-      await ref.read(lockServiceProvider).verifyAndStorePin(_newPin.text);
-      await ref.read(authControllerProvider.notifier).refresh();
-      _currentPin.clear();
-      _newPin.clear();
-      setState(() => _pinSaved = true);
-    } catch (_) {
-      setState(() => _pinError = "Couldn't set the security PIN");
-    } finally {
-      if (mounted) setState(() => _savingPin = false);
     }
   }
 
@@ -164,7 +133,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
           const SizedBox(height: 24),
           Text('CHANGE PASSWORD', style: Theme.of(context).textTheme.labelLarge?.copyWith(color: AppColors.textMuted)),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
+          const Padding(
+            padding: EdgeInsets.only(bottom: 8),
+            child: Text(
+              'This password also unlocks your Secure section — no separate PIN to set up.',
+              style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+            ),
+          ),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -192,53 +168,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         child: Text(_savingPassword ? 'Updating…' : 'Update password'),
                       ),
                       if (_passwordSaved) const Padding(padding: EdgeInsets.only(left: 12), child: Text('Updated', style: TextStyle(color: Colors.green))),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text('SECURITY PIN', style: Theme.of(context).textTheme.labelLarge?.copyWith(color: AppColors.textMuted)),
-          const SizedBox(height: 4),
-          const Padding(
-            padding: EdgeInsets.only(bottom: 8),
-            child: Text(
-              'One PIN protects every note you lock — set it once here, then "Add to Secure" on any note just adds it, no separate PIN per note.',
-              style: TextStyle(fontSize: 12, color: AppColors.textMuted),
-            ),
-          ),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (user?.hasSecurityPin == true) ...[
-                    TextField(
-                      controller: _currentPin,
-                      obscureText: true,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Current PIN'),
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-                  TextField(
-                    controller: _newPin,
-                    obscureText: true,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(labelText: user?.hasSecurityPin == true ? 'New PIN' : 'Set a PIN (4–12 digits)'),
-                  ),
-                  if (_pinError != null)
-                    Padding(padding: const EdgeInsets.only(top: 8), child: Text(_pinError!, style: const TextStyle(color: Colors.red))),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      ElevatedButton(
-                        onPressed: _savingPin ? null : _saveSecurityPin,
-                        child: Text(_savingPin ? 'Saving…' : (user?.hasSecurityPin == true ? 'Update PIN' : 'Set PIN')),
-                      ),
-                      if (_pinSaved) const Padding(padding: EdgeInsets.only(left: 12), child: Text('Saved', style: TextStyle(color: Colors.green))),
                     ],
                   ),
                 ],

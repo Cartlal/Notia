@@ -3,7 +3,7 @@ export interface User {
   email: string;
   name: string;
   avatarUrl?: string | null;
-  hasSecurityPin?: boolean;
+  hasPassword?: boolean;
 }
 
 export interface Tag {

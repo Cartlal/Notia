@@ -30,7 +30,7 @@ class AuthController extends AsyncNotifier<AuthUser?> {
 
   Future<void> logout() async {
     await ref.read(authServiceProvider).logout();
-    await ref.read(lockServiceProvider).forgetPin();
+    await ref.read(lockServiceProvider).forgetPassword();
     state = const AsyncData(null);
   }
 
@@ -44,9 +44,9 @@ class AuthController extends AsyncNotifier<AuthUser?> {
     state = const AsyncData(null);
   }
 
-  /// Re-fetches /auth/me — used after setting the security PIN, since that
-  /// flips `hasSecurityPin` server-side without otherwise changing the
-  /// cached user.
+  /// Re-fetches /auth/me — used after a change-password, since that can
+  /// flip `hasPassword` server-side without otherwise changing the cached
+  /// user.
   Future<void> refresh() async {
     final user = await ref.read(authServiceProvider).currentUser();
     state = AsyncData(user);

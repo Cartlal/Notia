@@ -30,13 +30,15 @@ const refreshCookieOptions = {
   maxAge: 30 * 24 * 60 * 60 * 1000,
 };
 
-function toSafeUser(user: { id: string; email: string; name: string; avatarUrl: string | null; securityPinHash?: string | null }) {
+function toSafeUser(user: { id: string; email: string; name: string; avatarUrl: string | null; passwordHash?: string | null }) {
   return {
     id: user.id,
     email: user.email,
     name: user.name,
     avatarUrl: user.avatarUrl,
-    hasSecurityPin: Boolean(user.securityPinHash),
+    // Whether the Secure section can be gated at all — a Google-only
+    // account has no password to verify against.
+    hasPassword: Boolean(user.passwordHash),
   };
 }
 
@@ -143,21 +145,19 @@ export async function updateProfile(req: AuthedRequest, res: Response) {
   res.json({ user: toSafeUser(user) });
 }
 
-const securityPinSchema = z.object({ pin: z.string().min(4).max(12) });
+// No separate "security PIN" to manage — the Secure section is gated by
+// the same account password used to log in (verified here), with the
+// device's own system authentication (fingerprint/system PIN/pattern) as
+// the on-device shortcut once that password has been entered once (see
+// mobile/lib/services/lock_service.dart).
+const verifyPasswordSchema = z.object({ password: z.string().min(1) });
 
-export async function setSecurityPin(req: AuthedRequest, res: Response) {
-  const { pin } = securityPinSchema.parse(req.body);
-  const securityPinHash = await bcrypt.hash(pin, 10);
-  await prisma.user.update({ where: { id: req.userId! }, data: { securityPinHash } });
-  res.status(204).send();
-}
-
-export async function verifySecurityPin(req: AuthedRequest, res: Response) {
-  const { pin } = securityPinSchema.parse(req.body);
+export async function verifyPassword(req: AuthedRequest, res: Response) {
+  const { password } = verifyPasswordSchema.parse(req.body);
   const user = await prisma.user.findUnique({ where: { id: req.userId! } });
-  if (!user?.securityPinHash) throw new ApiError(409, "no_security_pin", "No security PIN set yet");
-  const valid = await bcrypt.compare(pin, user.securityPinHash);
-  if (!valid) throw new ApiError(401, "invalid_pin", "Incorrect PIN");
+  if (!user?.passwordHash) throw new ApiError(409, "no_password", "This account has no password to verify against");
+  const valid = await bcrypt.compare(password, user.passwordHash);
+  if (!valid) throw new ApiError(401, "invalid_credentials", "Incorrect password");
   res.status(204).send();
 }
 
