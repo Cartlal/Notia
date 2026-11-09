@@ -10,7 +10,7 @@ final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.light);
 
 final authServiceProvider = Provider((ref) => AuthService());
 final notesServiceProvider = Provider((ref) => NotesService());
-final lockServiceProvider = Provider((ref) => LockService(ref.read(notesServiceProvider)));
+final lockServiceProvider = Provider((ref) => LockService(ref.read(authServiceProvider)));
 
 /// Holds the signed-in user, or null when signed out / not yet checked.
 /// `AsyncValue` so the UI can tell "still checking" apart from "signed out".
@@ -30,6 +30,7 @@ class AuthController extends AsyncNotifier<AuthUser?> {
 
   Future<void> logout() async {
     await ref.read(authServiceProvider).logout();
+    await ref.read(lockServiceProvider).forgetPin();
     state = const AsyncData(null);
   }
 
@@ -41,6 +42,14 @@ class AuthController extends AsyncNotifier<AuthUser?> {
   Future<void> deleteAccount() async {
     await ref.read(authServiceProvider).deleteAccount();
     state = const AsyncData(null);
+  }
+
+  /// Re-fetches /auth/me — used after setting the security PIN, since that
+  /// flips `hasSecurityPin` server-side without otherwise changing the
+  /// cached user.
+  Future<void> refresh() async {
+    final user = await ref.read(authServiceProvider).currentUser();
+    state = AsyncData(user);
   }
 }
 

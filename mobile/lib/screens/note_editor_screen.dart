@@ -89,18 +89,24 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
 
   Future<void> _tryUnlock() async {
     final lock = ref.read(lockServiceProvider);
-    final viaBiometrics = await lock.unlock(_noteId!);
-    if (viaBiometrics) {
+    final notes = ref.read(notesServiceProvider);
+
+    // Central lock: a PIN already verified elsewhere this session (or on
+    // an earlier app run) unlocks this note too via one fingerprint touch
+    // — no per-note re-entry.
+    final cachedPin = await lock.tryBiometricUnlock();
+    if (cachedPin != null && await notes.verifyLock(_noteId!, cachedPin)) {
       _fillFields(_note!);
       return;
     }
+
     if (!mounted) return;
-    final pin = await showPinDialog(context, title: 'Enter PIN', message: 'This note is protected.');
+    final pin = await showPinDialog(context, title: 'Enter security PIN', message: 'This note is in your Secure section.');
     if (pin == null) {
       if (mounted) Navigator.of(context).pop();
       return;
     }
-    final ok = await lock.unlockWithPin(_noteId!, pin);
+    final ok = await lock.verifyAndStorePin(pin) && await notes.verifyLock(_noteId!, pin);
     if (!mounted) return;
     if (ok) {
       _fillFields(_note!);
@@ -166,6 +172,9 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     setState(() => _attachments = [..._attachments, attachment]);
   }
 
+  // Locking a note just adds it to the Secure section — no PIN to type
+  // here, since one security PIN already covers every note in it. The
+  // one exception is the very first time: nothing to lock with yet.
   Future<void> _toggleLock() async {
     final id = await _ensureCreated();
     final notes = ref.read(notesServiceProvider);
@@ -174,10 +183,15 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       setState(() => _note = _note!.copyWithProtected(false));
       return;
     }
-    if (!mounted) return;
-    final pin = await showPinDialog(context, title: 'Set a PIN', message: 'Required to reopen this note (also usable with fingerprint).');
-    if (pin == null || pin.length < 4) return;
-    await notes.setLock(id, pin);
+    final user = ref.read(authControllerProvider).valueOrNull;
+    if (user?.hasSecurityPin != true) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Set a security PIN first, in Profile & settings')),
+      );
+      return;
+    }
+    await notes.setLock(id);
     setState(() => _note = _note?.copyWithProtected(true));
   }
 

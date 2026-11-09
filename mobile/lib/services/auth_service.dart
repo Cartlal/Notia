@@ -4,11 +4,16 @@ class AuthUser {
   final String id;
   final String email;
   final String name;
+  final bool hasSecurityPin;
 
-  AuthUser({required this.id, required this.email, required this.name});
+  AuthUser({required this.id, required this.email, required this.name, required this.hasSecurityPin});
 
-  factory AuthUser.fromJson(Map<String, dynamic> json) =>
-      AuthUser(id: json['id'], email: json['email'], name: json['name']);
+  factory AuthUser.fromJson(Map<String, dynamic> json) => AuthUser(
+        id: json['id'],
+        email: json['email'],
+        name: json['name'],
+        hasSecurityPin: json['hasSecurityPin'] ?? false,
+      );
 }
 
 class AuthService {
@@ -61,5 +66,16 @@ class AuthService {
   Future<void> deleteAccount() async {
     await _dio.delete('/auth/me');
     await ApiClient.instance.clearTokens();
+  }
+
+  Future<void> setSecurityPin(String pin) => _dio.post('/auth/security-pin', data: {'pin': pin});
+
+  Future<bool> verifySecurityPin(String pin) async {
+    try {
+      await _dio.post('/auth/security-pin/verify', data: {'pin': pin});
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 }

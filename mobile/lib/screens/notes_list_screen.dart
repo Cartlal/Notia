@@ -20,6 +20,7 @@ const _views = [
   ('favorites', 'Favorites', Icons.star_border),
   ('pinned', 'Pinned', Icons.push_pin_outlined),
   ('shared', 'Shared with me', Icons.people_outline),
+  ('locked', 'Secure', Icons.shield_outlined),
   ('archived', 'Archive', Icons.archive_outlined),
   ('trash', 'Trash', Icons.delete_outline),
 ];
@@ -73,7 +74,10 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
                   mainAxisSpacing: 12,
                 ),
                 itemCount: filtered.length,
-                itemBuilder: (context, i) => _NoteCard(note: filtered[i]),
+                itemBuilder: (context, i) => _NoteCard(
+                  note: filtered[i],
+                  onChanged: () => ref.invalidate(notesListProvider(_view)),
+                ),
               );
             },
           ),
@@ -210,7 +214,6 @@ class _Sidebar extends ConsumerWidget {
   }
 }
 
-/// Matches web/src/components/Logo.tsx: a white rounded square with a black
 /// Matches web/src/components/Logo.tsx, which renders the same asset.
 class _LogoBadge extends StatelessWidget {
   const _LogoBadge();
@@ -230,16 +233,49 @@ class _LogoBadge extends StatelessWidget {
   }
 }
 
-class _NoteCard extends StatelessWidget {
+class _NoteCard extends ConsumerWidget {
   final Note note;
-  const _NoteCard({required this.note});
+  final VoidCallback onChanged;
+  const _NoteCard({required this.note, required this.onChanged});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final notes = ref.read(notesServiceProvider);
+
+    Future<void> act(Future<void> Function() fn) async {
+      await fn();
+      onChanged();
+    }
+
+    void showActions() {
+      showModalBottomSheet(
+        context: context,
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+        builder: (context) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: note.isTrashed
+                ? [
+                    _ActionTile(icon: Icons.restore, label: 'Restore', onTap: () { Navigator.pop(context); act(() => notes.restore(note.id)); }),
+                    _ActionTile(icon: Icons.delete_forever, label: 'Delete permanently', danger: true, onTap: () { Navigator.pop(context); act(() => notes.delete(note.id)); }),
+                  ]
+                : [
+                    _ActionTile(icon: Icons.push_pin_outlined, label: note.isPinned ? 'Unpin' : 'Pin', onTap: () { Navigator.pop(context); act(() => notes.togglePin(note.id)); }),
+                    _ActionTile(icon: Icons.star_border, label: note.isFavorite ? 'Unfavorite' : 'Favorite', onTap: () { Navigator.pop(context); act(() => notes.toggleFavorite(note.id)); }),
+                    _ActionTile(icon: Icons.copy_outlined, label: 'Duplicate', onTap: () { Navigator.pop(context); act(() => notes.duplicate(note.id)); }),
+                    _ActionTile(icon: Icons.archive_outlined, label: note.isArchived ? 'Unarchive' : 'Archive', onTap: () { Navigator.pop(context); act(() => notes.toggleArchive(note.id)); }),
+                    _ActionTile(icon: Icons.delete_outline, label: 'Move to trash', danger: true, onTap: () { Navigator.pop(context); act(() => notes.trash(note.id)); }),
+                  ],
+          ),
+        ),
+      );
+    }
+
     return Card(
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => NoteEditorScreen(noteId: note.id))),
+        onLongPress: showActions,
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Column(
@@ -248,8 +284,12 @@ class _NoteCard extends StatelessWidget {
               Row(children: [
                 Expanded(child: Text(note.title.isEmpty ? 'Untitled' : note.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600))),
                 if (note.isProtected) const Icon(Icons.lock_outline, size: 14),
+                IconButton(
+                  icon: const Icon(Icons.more_vert, size: 18),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: showActions,
+                ),
               ]),
-              const SizedBox(height: 6),
               Expanded(
                 child: Text(
                   note.isProtected ? 'Protected note' : _plainText(note.content),
@@ -268,5 +308,23 @@ class _NoteCard extends StatelessWidget {
   String _plainText(String? html) {
     if (html == null) return '';
     return html.replaceAll(RegExp(r'<[^>]*>'), ' ').trim();
+  }
+}
+
+class _ActionTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool danger;
+  const _ActionTile({required this.icon, required this.label, required this.onTap, this.danger = false});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = danger ? Colors.red : null;
+    return ListTile(
+      leading: Icon(icon, color: color),
+      title: Text(label, style: TextStyle(color: color)),
+      onTap: onTap,
+    );
   }
 }

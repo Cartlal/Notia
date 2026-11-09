@@ -1,24 +1,21 @@
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:local_auth/local_auth.dart';
-import 'notes_service.dart';
+import 'auth_service.dart';
 
-/// Per-note protection: a note marked `isProtected` requires its PIN (set
-/// via NotesService.setLock, verified server-side via NotesService.verifyLock)
-/// before its content is shown. Fingerprint/face unlock is a convenience
-/// layer on top of that PIN, never a replacement for it on the server —
-/// the backend only ever knows about the PIN hash (see
-/// backend/src/controllers/notesController.ts: setNoteLock/unlockNote).
-///
-/// This service decides, on the device, when biometrics are allowed to
-/// stand in for typing the PIN again.
+/// Central lock: ONE security PIN gates every note marked `isProtected`,
+/// not a separate PIN per note (see backend's User.securityPinHash and
+/// notesController's setNoteLock/unlockNote, which both check that single
+/// hash now). Verifying it once — by typing it, or via a fingerprint that
+/// unlocks the securely-stored copy — opens every locked note for the rest
+/// of the session, matching the "central lock, not a separate one per note"
+/// request this replaced the old per-note design for.
 class LockService {
-  final NotesService _notes;
+  final AuthService _auth;
   final LocalAuthentication _bio = LocalAuthentication();
+  final _storage = const FlutterSecureStorage();
+  static const _pinKey = 'security_pin';
 
-  /// Notes unlocked earlier in this app session. Cleared when the process
-  /// restarts — nothing here is persisted to disk.
-  final Set<String> _sessionUnlocked = {};
-
-  LockService(this._notes);
+  LockService(this._auth);
 
   Future<bool> isBiometricAvailable() async {
     try {
@@ -30,46 +27,44 @@ class LockService {
     }
   }
 
-  /// Verifies a typed PIN against the server and, on success, remembers
-  /// this note as unlocked for the rest of the session.
-  Future<bool> unlockWithPin(String noteId, String pin) async {
-    final ok = await _notes.verifyLock(noteId, pin);
-    if (ok) _sessionUnlocked.add(noteId);
+  /// Verifies a typed PIN against the server and, on success, stores it
+  /// (encrypted, via flutter_secure_storage) so future opens — this
+  /// session or after an app restart — can be unlocked with just a
+  /// fingerprint instead of retyping it.
+  Future<bool> verifyAndStorePin(String pin) async {
+    final ok = await _auth.verifySecurityPin(pin);
+    if (ok) await _storage.write(key: _pinKey, value: pin);
     return ok;
   }
 
-  void lockAgain(String noteId) => _sessionUnlocked.remove(noteId);
+  Future<String?> _storedPin() => _storage.read(key: _pinKey);
 
-  /// Default unlock policy:
-  ///  1. Already unlocked this session → open immediately, no re-prompt.
-  ///  2. Biometric hardware available → try it. A device PIN/pattern
-  ///     fallback is allowed (`biometricOnly: false`) since the OS prompt
-  ///     is itself a legitimate "prove you are this device's owner" check,
-  ///     the same trust boundary Android/iOS use to guard other apps'
-  ///     locked content. Success marks the note unlocked for the session
-  ///     without calling the server — see the class doc: biometrics gate
-  ///     local access to a PIN the server already verified exists, not the
-  ///     PIN's secrecy itself, so this does not weaken server-side trust.
-  ///  3. Biometric unavailable, not enrolled, or declined/failed → return
-  ///     false. The caller (the lock screen) is expected to fall back to
-  ///     `unlockWithPin`, which *does* hit the server.
-  Future<bool> unlock(String noteId) async {
-    if (_sessionUnlocked.contains(noteId)) return true;
+  /// Call when the user explicitly re-locks the Secure section, and on
+  /// logout — forgets the cached PIN so biometrics stop being a shortcut
+  /// until it's typed again.
+  Future<void> forgetPin() => _storage.delete(key: _pinKey);
 
-    if (!await isBiometricAvailable()) return false;
+  /// The main entry point for opening anything protected. Returns the
+  /// verified PIN (ready to send to the server) on success, or null if
+  /// the caller should fall back to showing a PIN-entry dialog:
+  ///   1. No PIN stored yet → null (first time; nothing to unlock with).
+  ///   2. PIN stored + biometric succeeds → returns it, no typing needed.
+  ///   3. PIN stored but biometric unavailable/declined/failed → null,
+  ///      same as the old per-note design: biometric is a convenience
+  ///      layer, never a silent bypass when it can't be used.
+  Future<String?> tryBiometricUnlock() async {
+    final stored = await _storedPin();
+    if (stored == null) return null;
+    if (!await isBiometricAvailable()) return null;
 
     try {
       final didAuthenticate = await _bio.authenticate(
-        localizedReason: 'Unlock this note',
+        localizedReason: 'Unlock your secure notes',
         options: const AuthenticationOptions(biometricOnly: false, stickyAuth: true),
       );
-      if (didAuthenticate) {
-        _sessionUnlocked.add(noteId);
-        return true;
-      }
+      return didAuthenticate ? stored : null;
     } catch (_) {
-      // Lockout, cancellation, or a platform error — fall through to PIN.
+      return null;
     }
-    return false;
   }
 }

@@ -71,11 +71,8 @@ export default function NotePage() {
         // silently instead of prompting again.
         if (verifiedPin) {
           api
-            .post(`/notes/${note.id}/unlock`, { pin: verifiedPin })
-            .then(() => {
-              setUnlocked(true);
-              qc.invalidateQueries({ queryKey: ["note", note.id] });
-            })
+            .post<{ note: Note }>(`/notes/${note.id}/unlock`, { pin: verifiedPin })
+            .then(({ data }) => applyUnlockedNote(data.note))
             .catch(() => {
               setUnlocked(false);
               setShowLockModal("unlock");
@@ -89,6 +86,20 @@ export default function NotePage() {
       }
     }
   }, [note, verifiedPin, qc]);
+
+  // The unlock endpoint's response already carries the real content (the
+  // GET endpoint deliberately nulls it out for a locked note) — apply it
+  // directly instead of relying on a refetch, since loadedNoteIdRef (see
+  // above) would otherwise swallow that refetch as "already synced" and
+  // leave the editor showing an empty note after a correct PIN.
+  function applyUnlockedNote(unlockedNote: Note) {
+    setTitle(unlockedNote.title);
+    setContent(unlockedNote.content ?? "");
+    setColor(unlockedNote.color ?? null);
+    setAttachments(unlockedNote.attachments ?? []);
+    setUnlocked(true);
+    setShowLockModal(null);
+  }
 
   async function ensureNoteCreated(): Promise<string> {
     if (noteId) return noteId;
@@ -131,11 +142,9 @@ export default function NotePage() {
 
   async function handleUnlock(pin: string) {
     try {
-      await api.post(`/notes/${id}/unlock`, { pin });
+      const { data } = await api.post<{ note: Note }>(`/notes/${id}/unlock`, { pin });
       setVerifiedPin(pin);
-      setShowLockModal(null);
-      setUnlocked(true);
-      qc.invalidateQueries({ queryKey: ["note", id] });
+      applyUnlockedNote(data.note);
     } catch {
       setLockError("Incorrect PIN");
     }
