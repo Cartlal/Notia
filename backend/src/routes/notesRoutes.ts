@@ -3,6 +3,7 @@ import multer from "multer";
 import * as notes from "../controllers/notesController";
 import * as attachments from "../controllers/attachmentsController";
 import * as collaborators from "../controllers/collaboratorsController";
+import * as shareLinks from "../controllers/shareLinksController";
 import { requireAuth } from "../middleware/auth";
 import { asyncHandler } from "../lib/asyncHandler";
 
@@ -34,5 +35,9 @@ router.get("/:noteId/collaborators", asyncHandler(collaborators.listCollaborator
 router.post("/:noteId/collaborators", asyncHandler(collaborators.addCollaborator));
 router.patch("/:noteId/collaborators/:collaboratorId", asyncHandler(collaborators.updateCollaborator));
 router.delete("/:noteId/collaborators/:collaboratorId", asyncHandler(collaborators.removeCollaborator));
+
+router.get("/:noteId/share-links", asyncHandler(shareLinks.listShareLinks));
+router.post("/:noteId/share-links", asyncHandler(shareLinks.createShareLink));
+router.delete("/:noteId/share-links/:linkId", asyncHandler(shareLinks.revokeShareLink));
 
 export default router;

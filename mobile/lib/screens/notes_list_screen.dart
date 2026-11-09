@@ -1,0 +1,195 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/note.dart';
+import '../providers/providers.dart';
+import '../providers/notes_providers.dart';
+import '../theme/app_theme.dart';
+import 'note_editor_screen.dart';
+import 'login_screen.dart';
+
+class NotesListScreen extends ConsumerStatefulWidget {
+  const NotesListScreen({super.key});
+
+  @override
+  ConsumerState<NotesListScreen> createState() => _NotesListScreenState();
+}
+
+const _views = [
+  ('all', 'All notes', Icons.home_outlined),
+  ('favorites', 'Favorites', Icons.star_border),
+  ('pinned', 'Pinned', Icons.push_pin_outlined),
+  ('shared', 'Shared with me', Icons.people_outline),
+  ('archived', 'Archive', Icons.archive_outlined),
+  ('trash', 'Trash', Icons.delete_outline),
+];
+
+class _NotesListScreenState extends ConsumerState<NotesListScreen> {
+  String _view = 'all';
+  String _query = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final notesAsync = ref.watch(notesListProvider(_view));
+    final isWide = MediaQuery.of(context).size.width >= 760;
+
+    final sidebar = _Sidebar(
+      selected: _view,
+      onSelect: (v) => setState(() => _view = v),
+      onLogout: () async {
+        await ref.read(authControllerProvider.notifier).logout();
+        if (!mounted) return;
+        Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const LoginScreen()), (_) => false);
+      },
+    );
+
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: TextField(
+            decoration: const InputDecoration(
+              prefixIcon: Icon(Icons.search, size: 20),
+              hintText: 'Search notes…',
+              isDense: true,
+            ),
+            onChanged: (v) => setState(() => _query = v),
+          ),
+        ),
+        Expanded(
+          child: notesAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(child: Text('Could not load notes: $e')),
+            data: (notes) {
+              final filtered = _query.isEmpty
+                  ? notes
+                  : notes.where((n) => n.title.toLowerCase().contains(_query.toLowerCase())).toList();
+              if (filtered.isEmpty) {
+                return const Center(child: Text('No notes here yet.'));
+              }
+              return GridView.builder(
+                padding: const EdgeInsets.all(16),
+                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 260,
+                  mainAxisExtent: 150,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                ),
+                itemCount: filtered.length,
+                itemBuilder: (context, i) => _NoteCard(note: filtered[i]),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+
+    return Scaffold(
+      appBar: isWide
+          ? null
+          : AppBar(
+              title: const Text('Notia'),
+              actions: [IconButton(icon: const Icon(Icons.logout), onPressed: sidebar.onLogout)],
+            ),
+      drawer: isWide ? null : Drawer(child: sidebar),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () async {
+          await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NoteEditorScreen(noteId: null)));
+          ref.invalidate(notesListProvider(_view));
+        },
+        icon: const Icon(Icons.add),
+        label: const Text('New note'),
+      ),
+      body: isWide
+          ? Row(
+              children: [
+                SizedBox(width: 260, child: sidebar),
+                const VerticalDivider(width: 1),
+                Expanded(child: content),
+              ],
+            )
+          : content,
+    );
+  }
+}
+
+class _Sidebar extends StatelessWidget {
+  final String selected;
+  final ValueChanged<String> onSelect;
+  final VoidCallback onLogout;
+
+  const _Sidebar({required this.selected, required this.onSelect, required this.onLogout});
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Padding(
+            padding: EdgeInsets.all(16),
+            child: Row(children: [
+              Icon(Icons.description_outlined, color: AppColors.brand600),
+              SizedBox(width: 8),
+              Text('Notia', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
+            ]),
+          ),
+          for (final (key, label, icon) in _views)
+            ListTile(
+              leading: Icon(icon, size: 20),
+              title: Text(label),
+              selected: selected == key,
+              onTap: () => onSelect(key),
+            ),
+          const Spacer(),
+          ListTile(
+            leading: const Icon(Icons.logout, size: 20),
+            title: const Text('Log out'),
+            onTap: onLogout,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NoteCard extends StatelessWidget {
+  final Note note;
+  const _NoteCard({required this.note});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => NoteEditorScreen(noteId: note.id))),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                Expanded(child: Text(note.title.isEmpty ? 'Untitled' : note.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600))),
+                if (note.isProtected) const Icon(Icons.lock_outline, size: 14),
+              ]),
+              const SizedBox(height: 6),
+              Expanded(
+                child: Text(
+                  note.isProtected ? 'Protected note' : _plainText(note.content),
+                  maxLines: 4,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _plainText(String? html) {
+    if (html == null) return '';
+    return html.replaceAll(RegExp(r'<[^>]*>'), ' ').trim();
+  }
+}

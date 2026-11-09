@@ -37,6 +37,14 @@ export interface Collaborator {
 
 export type NoteRole = "OWNER" | CollaboratorRole;
 
+export interface ShareLink {
+  id: string;
+  token: string;
+  role: CollaboratorRole;
+  expiresAt: string | null;
+  createdAt: string;
+}
+
 export interface Note {
   id: string;
   userId: string;

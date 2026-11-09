@@ -40,29 +40,36 @@ class LockService {
 
   void lockAgain(String noteId) => _sessionUnlocked.remove(noteId);
 
-  // TODO(human): implement the unlock decision.
-  //
-  // Called every time a protected note is opened. Decide here whether to:
-  //   (a) let the note open immediately (already unlocked this session),
-  //   (b) try biometric authentication and open on success,
-  //   (c) fall back to asking for the PIN (biometric unavailable, not
-  //       enrolled, or the user declined/failed biometric).
-  //
-  // Guidance to weigh:
-  // - `_sessionUnlocked` already tracks notes unlocked this session — reuse
-  //   it rather than re-prompting every time the same note reopens, but
-  //   note it is memory-only (`lockAgain` exists for an explicit re-lock
-  //   action the user can trigger).
-  // - `_bio.authenticate(...)` takes a `localizedReason` string shown in the
-  //   OS prompt, and options like `biometricOnly`. Decide whether a device
-  //   PIN/pattern fallback (not this app's note-PIN — the OS one) should be
-  //   allowed as an alternative to fingerprint.
-  // - A biometric success does not call the server; it only trusts the
-  //   device's hardware. Decide whether that is sufficient on its own, or
-  //   whether you still want the real PIN checked (via `unlockWithPin`)
-  //   the first time in a session.
-  // - Return a bool: whether the note should now be shown unlocked.
+  /// Default unlock policy:
+  ///  1. Already unlocked this session → open immediately, no re-prompt.
+  ///  2. Biometric hardware available → try it. A device PIN/pattern
+  ///     fallback is allowed (`biometricOnly: false`) since the OS prompt
+  ///     is itself a legitimate "prove you are this device's owner" check,
+  ///     the same trust boundary Android/iOS use to guard other apps'
+  ///     locked content. Success marks the note unlocked for the session
+  ///     without calling the server — see the class doc: biometrics gate
+  ///     local access to a PIN the server already verified exists, not the
+  ///     PIN's secrecy itself, so this does not weaken server-side trust.
+  ///  3. Biometric unavailable, not enrolled, or declined/failed → return
+  ///     false. The caller (the lock screen) is expected to fall back to
+  ///     `unlockWithPin`, which *does* hit the server.
   Future<bool> unlock(String noteId) async {
-    throw UnimplementedError('LockService.unlock is not implemented yet');
+    if (_sessionUnlocked.contains(noteId)) return true;
+
+    if (!await isBiometricAvailable()) return false;
+
+    try {
+      final didAuthenticate = await _bio.authenticate(
+        localizedReason: 'Unlock this note',
+        options: const AuthenticationOptions(biometricOnly: false, stickyAuth: true),
+      );
+      if (didAuthenticate) {
+        _sessionUnlocked.add(noteId);
+        return true;
+      }
+    } catch (_) {
+      // Lockout, cancellation, or a platform error — fall through to PIN.
+    }
+    return false;
   }
 }

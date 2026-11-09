@@ -70,6 +70,25 @@ class Note {
     required this.updatedAt,
   });
 
+  Note copyWithProtected(bool value) => Note(
+        id: id,
+        title: title,
+        content: content,
+        color: color,
+        type: type,
+        isPinned: isPinned,
+        isFavorite: isFavorite,
+        isArchived: isArchived,
+        isTrashed: isTrashed,
+        isProtected: value,
+        locked: locked,
+        folderId: folderId,
+        version: version,
+        tags: tags,
+        attachments: attachments,
+        updatedAt: updatedAt,
+      );
+
   factory Note.fromJson(Map<String, dynamic> json) => Note(
         id: json['id'],
         title: json['title'] ?? 'Untitled',

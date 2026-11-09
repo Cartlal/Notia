@@ -11,6 +11,7 @@ import foldersRoutes from "./routes/foldersRoutes";
 import tagsRoutes from "./routes/tagsRoutes";
 import attachmentsRoutes from "./routes/attachmentsRoutes";
 import aiRoutes from "./routes/aiRoutes";
+import publicRoutes from "./routes/publicRoutes";
 
 export function createApp() {
   const app = express();
@@ -29,6 +30,7 @@ export function createApp() {
   app.use("/api/tags", tagsRoutes);
   app.use("/api/attachments", attachmentsRoutes);
   app.use("/api/ai", aiRoutes);
+  app.use("/api/public", publicRoutes);
 
   app.use(errorHandler);
   return app;

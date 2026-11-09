@@ -5,6 +5,7 @@ import RegisterPage from "@/pages/RegisterPage";
 import DashboardLayout from "@/pages/DashboardLayout";
 import NotesListPage from "@/pages/NotesListPage";
 import NotePage from "@/pages/NotePage";
+import PublicNotePage from "@/pages/PublicNotePage";
 import { RequireAuth } from "@/components/RequireAuth";
 
 const queryClient = new QueryClient();
@@ -16,6 +17,7 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/public/:token" element={<PublicNotePage />} />
 
           <Route element={<RequireAuth />}>
             <Route element={<DashboardLayout />}>

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Lock, Unlock, Palette, Share2 } from "lucide-react";
+import { ArrowLeft, Lock, Unlock, Palette, Share2, Share as ShareIcon } from "lucide-react";
 import { api } from "@/lib/api";
 import type { Note, Attachment, NoteRole } from "@/lib/types";
 import { NoteEditor, type PaperStyle } from "@/components/NoteEditor";
@@ -132,6 +132,31 @@ export default function NotePage() {
     setIsProtected(false);
   }
 
+  async function shareViaDevice() {
+    const plainText = document.createElement("div");
+    plainText.innerHTML = content;
+    const text = (plainText.textContent ?? "").slice(0, 500);
+
+    // navigator.share hands off to the OS's own share sheet — the Android
+    // share sheet, the Windows share flyout (Mail, WhatsApp Desktop,
+    // Snapchat and anything else registered as a share target), or the
+    // macOS/iOS share panel. There is no per-app integration to write:
+    // whatever's installed and registered just shows up.
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: title || "Untitled note", text });
+      } catch {
+        // User cancelled the share sheet — not an error.
+      }
+      return;
+    }
+
+    // No Web Share API (older desktop browsers): fall back to copying
+    // the note text so it can still be pasted into WhatsApp Web, Gmail, etc.
+    await navigator.clipboard.writeText(`${title || "Untitled note"}\n\n${text}`);
+    window.alert("Your browser doesn't support the native share sheet — the note was copied instead.");
+  }
+
   if (!isNew && isLoading) return <div className="p-6" style={{ color: "var(--color-text-muted)" }}>Loading…</div>;
 
   if (!isNew && isProtected && !unlocked) {
@@ -173,10 +198,13 @@ export default function NotePage() {
               </div>
             </div>
           )}
+          <button onClick={shareViaDevice} title="Share via WhatsApp, email, etc." className="flex items-center gap-1 text-sm px-2 py-1.5 rounded-lg hover-surface">
+            <ShareIcon size={14} /> Share via…
+          </button>
           {canWrite && <AudioRecorder onRecorded={(file) => uploadAttachment(file)} />}
           {isOwner && (
             <button onClick={() => setShowShareModal(true)} className="flex items-center gap-1 text-sm px-2 py-1.5 rounded-lg hover-surface">
-              <Share2 size={14} /> Share
+              <Share2 size={14} /> Collaborators
             </button>
           )}
           {isOwner && (isProtected ? (
