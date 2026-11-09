@@ -1,4 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Debug/profile builds get this injected automatically by the Flutter
+         tooling for the debugger connection; release builds don't, so every
+         network call (login, register, sync) silently fails without it. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <application
         android:label="notia_mobile"
         android:name="${applicationName}"
