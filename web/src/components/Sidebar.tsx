@@ -45,7 +45,7 @@ export function Sidebar() {
             key={to}
             to={to}
             className={({ isActive }) =>
-              `flex items-center gap-2 rounded-lg px-2.5 py-2 transition-colors ${isActive ? "bg-brand-100 text-brand-700 font-medium" : "hover:bg-brand-50"}`
+              `flex items-center gap-2 rounded-lg px-2.5 py-2 transition-colors ${isActive ? "bg-brand-100 text-brand-700 font-medium" : "hover-surface"}`
             }
           >
             <Icon size={16} /> {label}
@@ -58,7 +58,7 @@ export function Sidebar() {
           <p className="px-2 text-xs font-semibold uppercase mb-1" style={{ color: "var(--color-text-muted)" }}>Folders</p>
           <nav className="space-y-1 text-sm">
             {folders.map((f) => (
-              <NavLink key={f.id} to={`/folders/${f.id}`} className="flex items-center gap-2 rounded-lg px-2.5 py-2 hover:bg-brand-50">
+              <NavLink key={f.id} to={`/folders/${f.id}`} className="flex items-center gap-2 rounded-lg px-2.5 py-2 hover-surface">
                 <FolderIcon size={16} /> {f.name}
               </NavLink>
             ))}
@@ -71,7 +71,7 @@ export function Sidebar() {
           <p className="px-2 text-xs font-semibold uppercase mb-1" style={{ color: "var(--color-text-muted)" }}>Tags</p>
           <nav className="space-y-1 text-sm">
             {tags.map((t) => (
-              <NavLink key={t.id} to={`/tags/${t.id}`} className="flex items-center gap-2 rounded-lg px-2.5 py-2 hover:bg-brand-50">
+              <NavLink key={t.id} to={`/tags/${t.id}`} className="flex items-center gap-2 rounded-lg px-2.5 py-2 hover-surface">
                 <TagIcon size={16} /> {t.name}
               </NavLink>
             ))}
@@ -82,14 +82,14 @@ export function Sidebar() {
       <div className="mt-auto space-y-1 text-sm pt-4 border-t" style={{ borderColor: "var(--color-border)" }}>
         <button
           onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 hover:bg-brand-50"
+          className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 hover-surface"
         >
           {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />} Toggle theme
         </button>
         <div className="flex items-center gap-2 px-2.5 py-2 text-xs" style={{ color: "var(--color-text-muted)" }}>
           {user?.name}
         </div>
-        <button onClick={logout} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 hover:bg-brand-50 text-red-500">
+        <button onClick={logout} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 hover-surface text-red-500">
           <LogOut size={16} /> Log out
         </button>
       </div>

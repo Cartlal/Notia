@@ -3,9 +3,11 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Lock, Unlock, Palette } from "lucide-react";
 import { api } from "@/lib/api";
-import type { Note } from "@/lib/types";
-import { NoteEditor } from "@/components/NoteEditor";
+import type { Note, Attachment } from "@/lib/types";
+import { NoteEditor, type PaperStyle } from "@/components/NoteEditor";
 import { PinLockModal } from "@/components/PinLockModal";
+import { AudioRecorder } from "@/components/AudioRecorder";
+import { AttachmentsPanel } from "@/components/AttachmentsPanel";
 
 const COLORS = [null, "#FEF3C7", "#DBEAFE", "#DCFCE7", "#FCE7F3", "#EDE9FE"];
 
@@ -29,6 +31,8 @@ export default function NotePage() {
   const [showLockModal, setShowLockModal] = useState<"set" | "unlock" | null>(null);
   const [lockError, setLockError] = useState<string | null>(null);
   const [isProtected, setIsProtected] = useState(false);
+  const [paperStyle, setPaperStyle] = useState<PaperStyle>("none");
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
@@ -37,6 +41,7 @@ export default function NotePage() {
       setContent(note.content ?? "");
       setColor(note.color ?? null);
       setIsProtected(note.isProtected);
+      setAttachments(note.attachments ?? []);
       if (note.isProtected && note.locked) {
         setUnlocked(false);
         setShowLockModal("unlock");
@@ -64,12 +69,20 @@ export default function NotePage() {
     }, 500);
   }
 
-  async function uploadImage(file: File): Promise<string> {
+  async function uploadAttachment(file: File): Promise<Attachment> {
     const nid = await ensureNoteCreated();
     const form = new FormData();
     form.append("file", file);
-    const { data } = await api.post(`/notes/${nid}/attachments`, form, { headers: { "Content-Type": "multipart/form-data" } });
-    return data.attachment.url;
+    const { data } = await api.post<{ attachment: Attachment }>(`/notes/${nid}/attachments`, form, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    setAttachments((prev) => [...prev, data.attachment]);
+    return data.attachment;
+  }
+
+  async function uploadImage(file: File): Promise<string> {
+    const attachment = await uploadAttachment(file);
+    return attachment.url;
   }
 
   async function handleUnlock(pin: string) {
@@ -118,7 +131,7 @@ export default function NotePage() {
         </button>
         <div className="flex items-center gap-2">
           <div className="relative group">
-            <button className="p-2 rounded-lg hover:bg-brand-50"><Palette size={16} /></button>
+            <button className="p-2 rounded-lg hover-surface"><Palette size={16} /></button>
             <div className="absolute right-0 mt-1 hidden group-hover:flex gap-1 p-2 rounded-lg shadow-md note-card z-10">
               {COLORS.map((c) => (
                 <button
@@ -130,12 +143,13 @@ export default function NotePage() {
               ))}
             </div>
           </div>
+          <AudioRecorder onRecorded={(file) => uploadAttachment(file)} />
           {isProtected ? (
-            <button onClick={handleRemoveLock} className="flex items-center gap-1 text-sm px-2 py-1.5 rounded-lg hover:bg-brand-50">
+            <button onClick={handleRemoveLock} className="flex items-center gap-1 text-sm px-2 py-1.5 rounded-lg hover-surface">
               <Unlock size={14} /> Remove lock
             </button>
           ) : (
-            <button onClick={() => setShowLockModal("set")} className="flex items-center gap-1 text-sm px-2 py-1.5 rounded-lg hover:bg-brand-50">
+            <button onClick={() => setShowLockModal("set")} className="flex items-center gap-1 text-sm px-2 py-1.5 rounded-lg hover-surface">
               <Lock size={14} /> Lock note
             </button>
           )}
@@ -153,7 +167,10 @@ export default function NotePage() {
           content={content}
           onChange={(html, text) => { setContent(html); scheduleSave({ content: html, plainText: text }); }}
           onUploadImage={uploadImage}
+          paperStyle={paperStyle}
+          onPaperStyleChange={setPaperStyle}
         />
+        <AttachmentsPanel attachments={attachments} />
       </div>
 
       {showLockModal === "set" && (

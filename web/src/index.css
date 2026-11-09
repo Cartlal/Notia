@@ -1,44 +1,57 @@
 @import "tailwindcss";
 
+/* Neutral, professional palette: black/charcoal on white, no purple.
+   "brand" is a grayscale ramp used for buttons/active states; accent is
+   used sparingly (e.g. the default highlight-mark color). */
 :root {
-  --color-brand-50: #f1efff;
-  --color-brand-100: #e4e0ff;
-  --color-brand-200: #cac2ff;
-  --color-brand-300: #a99bff;
-  --color-brand-400: #8b78ff;
-  --color-brand-500: #6d58f5;
-  --color-brand-600: #5a3fe0;
-  --color-brand-700: #4a31bd;
-  --color-brand-800: #3c2896;
-  --color-brand-900: #302178;
+  --color-brand-50: #f6f6f7;
+  --color-brand-100: #ececee;
+  --color-brand-200: #d8d8db;
+  --color-brand-300: #b4b4ba;
+  --color-brand-400: #86868f;
+  --color-brand-500: #5a5a63;
+  --color-brand-600: #27272a;
+  --color-brand-700: #18181b;
+  --color-brand-800: #121214;
+  --color-brand-900: #0a0a0b;
 
-  --color-accent-500: #f5a623;
+  --color-accent-500: #e8b923;
 
   --color-bg: #ffffff;
-  --color-bg-subtle: #f7f7fb;
+  --color-bg-subtle: #f7f7f8;
   --color-surface: #ffffff;
-  --color-border: #e6e4f0;
-  --color-text: #17162b;
-  --color-text-muted: #6b6980;
+  --color-border: #e4e4e7;
+  --color-text: #18181b;
+  --color-text-muted: #6b6b73;
+
+  /* Subtle tint for hover/active surfaces. A fixed light gray (e.g.
+     brand-50) works in light mode but turns into a bright white blob
+     that swallows white text in dark mode — these must flip with theme. */
+  --color-hover: rgba(0, 0, 0, 0.05);
+  --color-active: rgba(0, 0, 0, 0.08);
 }
 
 :root[data-theme="dark"] {
-  --color-bg: #121020;
-  --color-bg-subtle: #17152a;
-  --color-surface: #1c1930;
-  --color-border: #2c2946;
-  --color-text: #f1efff;
-  --color-text-muted: #a6a3c2;
+  --color-bg: #0e0e10;
+  --color-bg-subtle: #151517;
+  --color-surface: #1a1a1d;
+  --color-border: #2a2a2e;
+  --color-text: #f6f6f7;
+  --color-text-muted: #a3a3ab;
+  --color-hover: rgba(255, 255, 255, 0.08);
+  --color-active: rgba(255, 255, 255, 0.14);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --color-bg: #121020;
-    --color-bg-subtle: #17152a;
-    --color-surface: #1c1930;
-    --color-border: #2c2946;
-    --color-text: #f1efff;
-    --color-text-muted: #a6a3c2;
+    --color-bg: #0e0e10;
+    --color-bg-subtle: #151517;
+    --color-surface: #1a1a1d;
+    --color-border: #2a2a2e;
+    --color-text: #f6f6f7;
+    --color-text-muted: #a3a3ab;
+    --color-hover: rgba(255, 255, 255, 0.08);
+    --color-active: rgba(255, 255, 255, 0.14);
   }
 }
 
@@ -65,4 +78,101 @@ body {
 .note-card {
   background-color: var(--color-surface);
   border: 1px solid var(--color-border);
+}
+
+.hover-surface:hover { background-color: var(--color-hover); }
+.active-surface { background-color: var(--color-active); }
+
+/* TipTap/ProseMirror renders unstyled content by default (black text,
+   no spacing) — without this it's invisible on a dark background since
+   nothing here inherits var(--color-text) automatically. */
+.tiptap.ProseMirror {
+  color: var(--color-text);
+  outline: none;
+  min-height: 200px;
+}
+.tiptap.ProseMirror h1 { font-size: 1.6em; font-weight: 700; margin: 0.6em 0 0.3em; }
+.tiptap.ProseMirror h2 { font-size: 1.3em; font-weight: 700; margin: 0.6em 0 0.3em; }
+.tiptap.ProseMirror h3 { font-size: 1.1em; font-weight: 700; margin: 0.6em 0 0.3em; }
+.tiptap.ProseMirror p { margin: 0.4em 0; }
+.tiptap.ProseMirror ul, .tiptap.ProseMirror ol { padding-left: 1.4em; margin: 0.4em 0; }
+.tiptap.ProseMirror ul { list-style: disc; }
+.tiptap.ProseMirror ol { list-style: decimal; }
+.tiptap.ProseMirror li { margin: 0.15em 0; }
+.tiptap.ProseMirror li::marker { color: var(--color-text-muted); }
+
+.tiptap.ProseMirror ul[data-type="taskList"] { list-style: none; padding-left: 0; }
+.tiptap.ProseMirror ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5em;
+}
+.tiptap.ProseMirror ul[data-type="taskList"] li > label {
+  display: flex;
+  align-items: center;
+  margin-top: 0.2em;
+  user-select: none;
+}
+.tiptap.ProseMirror ul[data-type="taskList"] li > div { flex: 1; }
+.tiptap.ProseMirror ul[data-type="taskList"] input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--color-brand-600);
+  cursor: pointer;
+}
+.tiptap.ProseMirror ul[data-type="taskList"] li[data-checked="true"] > div {
+  color: var(--color-text-muted);
+  text-decoration: line-through;
+}
+
+.tiptap.ProseMirror mark {
+  border-radius: 3px;
+  padding: 0 0.1em;
+  background-color: var(--highlight-color, #fef08a);
+  color: inherit;
+}
+
+.tiptap.ProseMirror blockquote {
+  border-left: 3px solid var(--color-border);
+  padding-left: 0.8em;
+  color: var(--color-text-muted);
+  margin: 0.5em 0;
+}
+.tiptap.ProseMirror pre {
+  background-color: var(--color-bg-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 0.8em;
+  overflow-x: auto;
+}
+.tiptap.ProseMirror code { font-family: ui-monospace, monospace; }
+.tiptap.ProseMirror img { max-width: 100%; border-radius: 8px; }
+.tiptap.ProseMirror table { border-collapse: collapse; width: 100%; margin: 0.5em 0; }
+.tiptap.ProseMirror th, .tiptap.ProseMirror td {
+  border: 1px solid var(--color-border);
+  padding: 0.4em 0.6em;
+}
+.tiptap.ProseMirror a { color: var(--color-brand-600); text-decoration: underline; }
+
+/* Ruled / grid "paper" writing surfaces, toggled per note. Line spacing
+   matches the editor's line-height (1.75em) so text sits on the rules. */
+.tiptap.ProseMirror.paper-ruled {
+  line-height: 1.75em;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent,
+    transparent calc(1.75em - 1px),
+    var(--color-border) calc(1.75em - 1px),
+    var(--color-border) 1.75em
+  );
+  background-position: 0 0.2em;
+  padding-left: 1.5em;
+  border-left: 2px solid #e8a3a3;
+}
+.tiptap.ProseMirror.paper-grid {
+  line-height: 1.75em;
+  background-image:
+    repeating-linear-gradient(to bottom, transparent, transparent calc(1.75em - 1px), var(--color-border) calc(1.75em - 1px), var(--color-border) 1.75em),
+    repeating-linear-gradient(to right, transparent, transparent calc(1.75em - 1px), var(--color-border) calc(1.75em - 1px), var(--color-border) 1.75em);
+  background-position: 0 0.2em;
 }

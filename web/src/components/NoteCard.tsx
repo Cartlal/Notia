@@ -36,19 +36,19 @@ export function NoteCard({ note }: { note: Note }) {
         style={{ backgroundColor: "var(--color-surface)" }}
         onClick={(e) => e.stopPropagation()}
       >
-        <button title="Pin" onClick={() => pin.mutate(note.id)} className="p-1.5 rounded hover:bg-brand-50">
+        <button title="Pin" onClick={() => pin.mutate(note.id)} className="p-1.5 rounded hover-surface">
           <Pin size={14} fill={note.isPinned ? "currentColor" : "none"} />
         </button>
-        <button title="Favorite" onClick={() => favorite.mutate(note.id)} className="p-1.5 rounded hover:bg-brand-50">
+        <button title="Favorite" onClick={() => favorite.mutate(note.id)} className="p-1.5 rounded hover-surface">
           <Star size={14} fill={note.isFavorite ? "currentColor" : "none"} />
         </button>
-        <button title="Duplicate" onClick={() => duplicate.mutate(note.id)} className="p-1.5 rounded hover:bg-brand-50">
+        <button title="Duplicate" onClick={() => duplicate.mutate(note.id)} className="p-1.5 rounded hover-surface">
           <Copy size={14} />
         </button>
-        <button title="Archive" onClick={() => archive.mutate(note.id)} className="p-1.5 rounded hover:bg-brand-50">
+        <button title="Archive" onClick={() => archive.mutate(note.id)} className="p-1.5 rounded hover-surface">
           <Archive size={14} />
         </button>
-        <button title="Trash" onClick={() => trash.mutate(note.id)} className="p-1.5 rounded hover:bg-brand-50 text-red-500">
+        <button title="Trash" onClick={() => trash.mutate(note.id)} className="p-1.5 rounded hover-surface text-red-500">
           <Trash2 size={14} />
         </button>
       </div>

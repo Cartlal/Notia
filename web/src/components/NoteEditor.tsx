@@ -9,25 +9,53 @@ import { Table } from "@tiptap/extension-table";
 import TableRow from "@tiptap/extension-table-row";
 import TableCell from "@tiptap/extension-table-cell";
 import TableHeader from "@tiptap/extension-table-header";
-import { useEffect, useRef } from "react";
+import { TextStyle } from "@tiptap/extension-text-style";
+import FontFamily from "@tiptap/extension-font-family";
+import Highlight from "@tiptap/extension-highlight";
+import { useEffect, useRef, useState } from "react";
 import {
   Bold, Italic, UnderlineIcon, Strikethrough, List, ListOrdered, CheckSquare,
   Quote, Code, Link as LinkIcon, Image as ImageIcon, Table as TableIcon, Undo2, Redo2,
-  Heading1, Heading2, Heading3, Paperclip,
+  Heading1, Heading2, Heading3, Paperclip, Highlighter, Type, Rows3, Grid2x2, FileText,
 } from "lucide-react";
+import { FontSize } from "@/lib/fontSize";
+
+const FONTS = [
+  { label: "Default", value: "" },
+  { label: "Inter", value: "Inter, ui-sans-serif, sans-serif" },
+  { label: "Comic Neue", value: "'Comic Neue', cursive" },
+  { label: "Georgia", value: "Georgia, serif" },
+  { label: "Mono", value: "'JetBrains Mono', ui-monospace, monospace" },
+];
+
+const SIZES = [
+  { label: "Normal", value: "" },
+  { label: "Small", value: "13px" },
+  { label: "Large", value: "20px" },
+  { label: "XL", value: "26px" },
+];
+
+const HIGHLIGHTS = ["#fef08a", "#bbf7d0", "#bfdbfe", "#fecaca", "#e9d5ff"];
+
+export type PaperStyle = "none" | "ruled" | "grid";
 
 export function NoteEditor({
   content,
   onChange,
   onUploadImage,
   editable = true,
+  paperStyle = "none",
+  onPaperStyleChange,
 }: {
   content: string;
   onChange: (html: string, text: string) => void;
   onUploadImage: (file: File) => Promise<string>;
   editable?: boolean;
+  paperStyle?: PaperStyle;
+  onPaperStyleChange?: (style: PaperStyle) => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showHighlights, setShowHighlights] = useState(false);
 
   const editor = useEditor({
     extensions: [
@@ -41,9 +69,14 @@ export function NoteEditor({
       TableRow,
       TableHeader,
       TableCell,
+      TextStyle,
+      FontFamily,
+      FontSize,
+      Highlight.configure({ multicolor: true }),
     ],
     content,
     editable,
+    editorProps: { attributes: { class: `tiptap paper-${paperStyle}` } },
     onUpdate: ({ editor }) => onChange(editor.getHTML(), editor.getText()),
   });
 
@@ -52,6 +85,13 @@ export function NoteEditor({
       editor.commands.setContent(content, { emitUpdate: false });
     }
   }, [content, editor]);
+
+  useEffect(() => {
+    if (!editor) return;
+    const dom = editor.view.dom;
+    dom.classList.remove("paper-none", "paper-ruled", "paper-grid");
+    dom.classList.add(`paper-${paperStyle}`);
+  }, [editor, paperStyle]);
 
   if (!editor) return null;
 
@@ -67,16 +107,82 @@ export function NoteEditor({
   }
 
   const btn = (active: boolean) =>
-    `p-2 rounded-lg hover:bg-brand-50 ${active ? "bg-brand-100 text-brand-700" : ""}`;
+    `p-2 rounded-lg hover-surface ${active ? "bg-brand-100 text-brand-700" : ""}`;
 
   return (
     <div className="flex flex-col h-full">
       {editable && (
-        <div className="flex flex-wrap items-center gap-0.5 border-b pb-2 mb-3" style={{ borderColor: "var(--color-border)" }}>
+        <div
+          className="flex flex-wrap items-center gap-0.5 border-b pb-2 mb-3"
+          style={{ borderColor: "var(--color-border)" }}
+          // A <button>'s default mousedown behavior steals focus (and with
+          // it, the browser's text selection) from the contenteditable
+          // editor before React's onClick ever fires — so every command
+          // below would silently apply to an empty selection. Selects are
+          // excluded: preventing their mousedown stops the dropdown from
+          // opening at all.
+          onMouseDown={(e) => {
+            if ((e.target as HTMLElement).closest("button")) e.preventDefault();
+          }}
+        >
+          <select
+            className="text-sm rounded-md px-1.5 py-1.5 outline-none border mr-1"
+            style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v) editor.chain().focus().setFontFamily(v).run();
+              else editor.chain().focus().unsetFontFamily().run();
+            }}
+            title="Font"
+          >
+            {FONTS.map((f) => (
+              <option key={f.label} value={f.value}>{f.label}</option>
+            ))}
+          </select>
+          <select
+            className="text-sm rounded-md px-1.5 py-1.5 outline-none border mr-1"
+            style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v) editor.chain().focus().setFontSize(v).run();
+              else editor.chain().focus().unsetFontSize().run();
+            }}
+            title="Text size"
+          >
+            {SIZES.map((s) => (
+              <option key={s.label} value={s.value}>{s.label}</option>
+            ))}
+          </select>
+          <span className="w-px h-5 mx-1" style={{ backgroundColor: "var(--color-border)" }} />
           <button className={btn(editor.isActive("bold"))} onClick={() => editor.chain().focus().toggleBold().run()}><Bold size={16} /></button>
           <button className={btn(editor.isActive("italic"))} onClick={() => editor.chain().focus().toggleItalic().run()}><Italic size={16} /></button>
           <button className={btn(editor.isActive("underline"))} onClick={() => editor.chain().focus().toggleUnderline().run()}><UnderlineIcon size={16} /></button>
           <button className={btn(editor.isActive("strike"))} onClick={() => editor.chain().focus().toggleStrike().run()}><Strikethrough size={16} /></button>
+          <div className="relative">
+            <button className={btn(editor.isActive("highlight"))} onClick={() => setShowHighlights((v) => !v)} title="Highlight">
+              <Highlighter size={16} />
+            </button>
+            {showHighlights && (
+              <div className="absolute top-full mt-1 flex gap-1 p-2 rounded-lg shadow-md note-card z-10">
+                {HIGHLIGHTS.map((c) => (
+                  <button
+                    key={c}
+                    className="w-5 h-5 rounded-full border"
+                    style={{ backgroundColor: c, borderColor: "var(--color-border)" }}
+                    onClick={() => { editor.chain().focus().toggleHighlight({ color: c }).run(); setShowHighlights(false); }}
+                  />
+                ))}
+                <button
+                  className="w-5 h-5 rounded-full border flex items-center justify-center text-xs"
+                  style={{ borderColor: "var(--color-border)" }}
+                  title="Remove highlight"
+                  onClick={() => { editor.chain().focus().unsetHighlight().run(); setShowHighlights(false); }}
+                >
+                  ×
+                </button>
+              </div>
+            )}
+          </div>
           <span className="w-px h-5 mx-1" style={{ backgroundColor: "var(--color-border)" }} />
           <button className={btn(editor.isActive("heading", { level: 1 }))} onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}><Heading1 size={16} /></button>
           <button className={btn(editor.isActive("heading", { level: 2 }))} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}><Heading2 size={16} /></button>
@@ -110,17 +216,25 @@ export function NoteEditor({
             <TableIcon size={16} />
           </button>
           <span className="w-px h-5 mx-1" style={{ backgroundColor: "var(--color-border)" }} />
+          {onPaperStyleChange && (
+            <>
+              <button className={btn(paperStyle === "none")} title="Plain page" onClick={() => onPaperStyleChange("none")}><FileText size={16} /></button>
+              <button className={btn(paperStyle === "ruled")} title="Ruled page" onClick={() => onPaperStyleChange("ruled")}><Rows3 size={16} /></button>
+              <button className={btn(paperStyle === "grid")} title="Grid page" onClick={() => onPaperStyleChange("grid")}><Grid2x2 size={16} /></button>
+              <span className="w-px h-5 mx-1" style={{ backgroundColor: "var(--color-border)" }} />
+            </>
+          )}
           <button className={btn(false)} onClick={() => editor.chain().focus().undo().run()}><Undo2 size={16} /></button>
           <button className={btn(false)} onClick={() => editor.chain().focus().redo().run()}><Redo2 size={16} /></button>
           <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
         </div>
       )}
 
-      <EditorContent editor={editor} className="flex-1 prose prose-sm max-w-none focus:outline-none" />
+      <EditorContent editor={editor} className="flex-1 max-w-none focus:outline-none" />
 
       {editable && (
-        <div className="pt-2 text-xs text-right" style={{ color: "var(--color-text-muted)" }}>
-          {wordCount} words · {charCount} characters
+        <div className="pt-2 text-xs text-right flex items-center justify-end gap-1" style={{ color: "var(--color-text-muted)" }}>
+          <Type size={12} /> {wordCount} words · {charCount} characters
         </div>
       )}
     </div>
