@@ -1,0 +1,272 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AuthProvider {
+  LOCAL
+  GOOGLE
+}
+
+enum NoteType {
+  STANDARD
+  CHECKLIST
+  DAILY
+  MEETING
+  JOURNAL
+}
+
+enum ShareRole {
+  VIEWER
+  EDITOR
+}
+
+enum ReminderRecurrence {
+  NONE
+  DAILY
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+model User {
+  id            String       @id @default(uuid())
+  email         String       @unique
+  passwordHash  String?
+  name          String
+  avatarUrl     String?
+  authProvider  AuthProvider @default(LOCAL)
+  googleId      String?      @unique
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  notes         Note[]
+  folders       Folder[]
+  tags          Tag[]
+  attachments   Attachment[]
+  reminders     Reminder[]
+  tasks         Task[]
+  sharedByMe    SharedNote[]   @relation("ShareOwner")
+  collaborations Collaborator[]
+  comments      Comment[]
+  settings      UserSettings?
+  aiConversations AIConversation[]
+
+  @@index([email])
+}
+
+model UserSettings {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  theme         String   @default("system")
+  defaultView   String   @default("grid")
+  aiEnabled     Boolean  @default(true)
+  updatedAt     DateTime @updatedAt
+}
+
+model Folder {
+  id        String   @id @default(uuid())
+  name      String
+  color     String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parentId  String?
+  parent    Folder?  @relation("FolderTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children  Folder[] @relation("FolderTree")
+  notes     Note[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([parentId])
+}
+
+model Tag {
+  id        String    @id @default(uuid())
+  name      String
+  color     String?
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  noteTags  NoteTag[]
+  createdAt DateTime  @default(now())
+
+  @@unique([userId, name])
+}
+
+model Note {
+  id            String       @id @default(uuid())
+  title         String       @default("Untitled")
+  content       String       @default("")
+  contentJson   String?
+  plainText     String       @default("")
+  color         String?
+  type          NoteType     @default(STANDARD)
+  isPinned      Boolean      @default(false)
+  isFavorite    Boolean      @default(false)
+  isArchived    Boolean      @default(false)
+  isTrashed     Boolean      @default(false)
+  trashedAt     DateTime?
+  sortOrder     Int          @default(0)
+  version       Int          @default(1)
+
+  isProtected   Boolean      @default(false)
+  pinHash       String?
+
+  userId        String
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  folderId      String?
+  folder        Folder?      @relation(fields: [folderId], references: [id], onDelete: SetNull)
+
+  noteTags      NoteTag[]
+  attachments   Attachment[]
+  reminders     Reminder[]
+  tasks         Task[]
+  shares        SharedNote[]
+  collaborators Collaborator[]
+  comments      Comment[]
+  versions      NoteVersion[]
+  embeddings    AIEmbedding[]
+
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([userId])
+  @@index([folderId])
+  @@index([userId, isTrashed, isArchived])
+}
+
+model NoteTag {
+  noteId String
+  tagId  String
+  note   Note   @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([noteId, tagId])
+}
+
+model Attachment {
+  id        String   @id @default(uuid())
+  noteId    String
+  note      Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fileName  String
+  mimeType  String
+  sizeBytes Int
+  url       String
+  kind      String   @default("file")
+  ocrText   String?
+  createdAt DateTime @default(now())
+
+  @@index([noteId])
+}
+
+model Reminder {
+  id          String             @id @default(uuid())
+  noteId      String
+  note        Note               @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  remindAt    DateTime
+  recurrence  ReminderRecurrence @default(NONE)
+  isCompleted Boolean            @default(false)
+  createdAt   DateTime           @default(now())
+
+  @@index([userId, remindAt])
+}
+
+model Task {
+  id          String    @id @default(uuid())
+  noteId      String
+  note        Note      @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  text        String
+  isCompleted Boolean   @default(false)
+  priority    Int       @default(0)
+  dueAt       DateTime?
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+
+  @@index([noteId])
+}
+
+model SharedNote {
+  id        String    @id @default(uuid())
+  noteId    String
+  note      Note      @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  ownerId   String
+  owner     User      @relation("ShareOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  token     String    @unique @default(uuid())
+  role      ShareRole @default(VIEWER)
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([noteId])
+}
+
+model Collaborator {
+  id       String    @id @default(uuid())
+  noteId   String
+  note     Note      @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role     ShareRole @default(VIEWER)
+  addedAt  DateTime  @default(now())
+
+  @@unique([noteId, userId])
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  noteId    String
+  note      Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  body      String
+  createdAt DateTime @default(now())
+
+  @@index([noteId])
+}
+
+model NoteVersion {
+  id         String   @id @default(uuid())
+  noteId     String
+  note       Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  content    String
+  contentJson String?
+  title      String
+  version    Int
+  createdAt  DateTime @default(now())
+
+  @@index([noteId])
+}
+
+model AIConversation {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  noteId    String?
+  title     String   @default("New conversation")
+  messages  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model AIEmbedding {
+  id        String   @id @default(uuid())
+  noteId    String
+  note      Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  chunkText String
+  vector    String
+  createdAt DateTime @default(now())
+
+  @@index([noteId])
+}
