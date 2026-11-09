@@ -22,6 +22,7 @@ export default function App() {
               <Route path="/" element={<NotesListPage view="all" />} />
               <Route path="/favorites" element={<NotesListPage view="favorites" />} />
               <Route path="/pinned" element={<NotesListPage view="pinned" />} />
+              <Route path="/shared" element={<NotesListPage view="shared" />} />
               <Route path="/archived" element={<NotesListPage view="archived" />} />
               <Route path="/trash" element={<NotesListPage view="trash" />} />
               <Route path="/folders/:folderId" element={<NotesListPage view="all" />} />

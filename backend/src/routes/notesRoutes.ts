@@ -2,6 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import * as notes from "../controllers/notesController";
 import * as attachments from "../controllers/attachmentsController";
+import * as collaborators from "../controllers/collaboratorsController";
 import { requireAuth } from "../middleware/auth";
 import { asyncHandler } from "../lib/asyncHandler";
 
@@ -28,5 +29,10 @@ router.delete("/:id/lock", asyncHandler(notes.removeNoteLock));
 router.post("/:id/unlock", asyncHandler(notes.unlockNote));
 
 router.post("/:noteId/attachments", upload.single("file"), asyncHandler(attachments.uploadAttachment));
+
+router.get("/:noteId/collaborators", asyncHandler(collaborators.listCollaborators));
+router.post("/:noteId/collaborators", asyncHandler(collaborators.addCollaborator));
+router.patch("/:noteId/collaborators/:collaboratorId", asyncHandler(collaborators.updateCollaborator));
+router.delete("/:noteId/collaborators/:collaboratorId", asyncHandler(collaborators.removeCollaborator));
 
 export default router;

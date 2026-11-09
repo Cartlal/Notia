@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Lock, Unlock, Palette } from "lucide-react";
+import { ArrowLeft, Lock, Unlock, Palette, Share2 } from "lucide-react";
 import { api } from "@/lib/api";
-import type { Note, Attachment } from "@/lib/types";
+import type { Note, Attachment, NoteRole } from "@/lib/types";
 import { NoteEditor, type PaperStyle } from "@/components/NoteEditor";
 import { PinLockModal } from "@/components/PinLockModal";
 import { AudioRecorder } from "@/components/AudioRecorder";
 import { AttachmentsPanel } from "@/components/AttachmentsPanel";
+import { ShareModal } from "@/components/ShareModal";
 
 const COLORS = [null, "#FEF3C7", "#DBEAFE", "#DCFCE7", "#FCE7F3", "#EDE9FE"];
 
@@ -17,11 +18,16 @@ export default function NotePage() {
   const qc = useQueryClient();
   const isNew = id === "new";
 
-  const { data: note, isLoading } = useQuery({
+  const { data: noteResponse, isLoading } = useQuery({
     queryKey: ["note", id],
-    queryFn: async () => (await api.get<{ note: Note }>(`/notes/${id}`)).data.note,
+    queryFn: async () => (await api.get<{ note: Note; role: NoteRole }>(`/notes/${id}`)).data,
     enabled: !isNew,
   });
+  const note = noteResponse?.note;
+  const role: NoteRole = isNew ? "OWNER" : (noteResponse?.role ?? "OWNER");
+  const isOwner = role === "OWNER";
+  const canWrite = role !== "VIEWER";
+  const [showShareModal, setShowShareModal] = useState(false);
 
   const [noteId, setNoteId] = useState<string | null>(isNew ? null : (id ?? null));
   const [title, setTitle] = useState("");
@@ -35,8 +41,20 @@ export default function NotePage() {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
+  // Guards against clobbering in-progress typing with server data. Without
+  // this, creating a brand-new note mid-typing triggers a redirect from
+  // /notes/new to /notes/<id>, which fires this note's first fetch — and
+  // when that response lands, syncing it into state would overwrite
+  // whatever the user kept typing in the meantime (the title field is a
+  // controlled input, so this was visible as text vanishing mid-keystroke).
+  // Each note id is only ever synced from the server once; afterwards the
+  // locally-typed state is the source of truth until the user navigates to
+  // a genuinely different note.
+  const loadedNoteIdRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (note) {
+    if (note && loadedNoteIdRef.current !== note.id) {
+      loadedNoteIdRef.current = note.id;
       setTitle(note.title);
       setContent(note.content ?? "");
       setColor(note.color ?? null);
@@ -55,12 +73,17 @@ export default function NotePage() {
     if (noteId) return noteId;
     const { data } = await api.post<{ note: Note }>("/notes", { title, content });
     setNoteId(data.note.id);
+    // Mark as already-synced before the redirect's fetch can land, so that
+    // fetch (which only reflects this snapshot) never overwrites newer
+    // local edits typed in the meantime.
+    loadedNoteIdRef.current = data.note.id;
     qc.invalidateQueries({ queryKey: ["notes"] });
     navigate(`/notes/${data.note.id}`, { replace: true });
     return data.note.id;
   }
 
   function scheduleSave(next: { title?: string; content?: string; plainText?: string; color?: string | null }) {
+    if (!canWrite) return;
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
       const nid = await ensureNoteCreated();
@@ -130,21 +153,33 @@ export default function NotePage() {
           <ArrowLeft size={16} /> Back
         </button>
         <div className="flex items-center gap-2">
-          <div className="relative group">
-            <button className="p-2 rounded-lg hover-surface"><Palette size={16} /></button>
-            <div className="absolute right-0 mt-1 hidden group-hover:flex gap-1 p-2 rounded-lg shadow-md note-card z-10">
-              {COLORS.map((c) => (
-                <button
-                  key={c ?? "none"}
-                  onClick={() => { setColor(c); scheduleSave({ color: c }); }}
-                  className="w-6 h-6 rounded-full border"
-                  style={{ backgroundColor: c ?? "var(--color-surface)", borderColor: "var(--color-border)" }}
-                />
-              ))}
+          {!isOwner && (
+            <span className="text-xs px-2 py-1 rounded-full" style={{ backgroundColor: "var(--color-hover)", color: "var(--color-text-muted)" }}>
+              {canWrite ? "Can edit" : "View only"} · shared with you
+            </span>
+          )}
+          {isOwner && (
+            <div className="relative group">
+              <button className="p-2 rounded-lg hover-surface"><Palette size={16} /></button>
+              <div className="absolute right-0 mt-1 hidden group-hover:flex gap-1 p-2 rounded-lg shadow-md note-card z-10">
+                {COLORS.map((c) => (
+                  <button
+                    key={c ?? "none"}
+                    onClick={() => { setColor(c); scheduleSave({ color: c }); }}
+                    className="w-6 h-6 rounded-full border"
+                    style={{ backgroundColor: c ?? "var(--color-surface)", borderColor: "var(--color-border)" }}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
-          <AudioRecorder onRecorded={(file) => uploadAttachment(file)} />
-          {isProtected ? (
+          )}
+          {canWrite && <AudioRecorder onRecorded={(file) => uploadAttachment(file)} />}
+          {isOwner && (
+            <button onClick={() => setShowShareModal(true)} className="flex items-center gap-1 text-sm px-2 py-1.5 rounded-lg hover-surface">
+              <Share2 size={14} /> Share
+            </button>
+          )}
+          {isOwner && (isProtected ? (
             <button onClick={handleRemoveLock} className="flex items-center gap-1 text-sm px-2 py-1.5 rounded-lg hover-surface">
               <Unlock size={14} /> Remove lock
             </button>
@@ -152,23 +187,25 @@ export default function NotePage() {
             <button onClick={() => setShowLockModal("set")} className="flex items-center gap-1 text-sm px-2 py-1.5 rounded-lg hover-surface">
               <Lock size={14} /> Lock note
             </button>
-          )}
+          ))}
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto px-8 py-6 max-w-3xl mx-auto w-full" style={{ backgroundColor: color ?? "transparent" }}>
         <input
           value={title}
+          disabled={!canWrite}
           onChange={(e) => { setTitle(e.target.value); scheduleSave({ title: e.target.value }); }}
           placeholder="Untitled"
-          className="w-full text-2xl font-semibold outline-none mb-4 bg-transparent"
+          className="w-full text-2xl font-semibold outline-none mb-4 bg-transparent disabled:opacity-80"
         />
         <NoteEditor
           content={content}
           onChange={(html, text) => { setContent(html); scheduleSave({ content: html, plainText: text }); }}
           onUploadImage={uploadImage}
           paperStyle={paperStyle}
-          onPaperStyleChange={setPaperStyle}
+          onPaperStyleChange={canWrite ? setPaperStyle : undefined}
+          editable={canWrite}
         />
         <AttachmentsPanel attachments={attachments} />
       </div>
@@ -176,6 +213,7 @@ export default function NotePage() {
       {showLockModal === "set" && (
         <PinLockModal mode="set" onSubmit={handleSetLock} onCancel={() => setShowLockModal(null)} />
       )}
+      {showShareModal && noteId && <ShareModal noteId={noteId} onClose={() => setShowShareModal(false)} />}
     </div>
   );
 }

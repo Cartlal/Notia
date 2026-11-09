@@ -26,8 +26,20 @@ export interface Attachment {
   kind: string;
 }
 
+export type CollaboratorRole = "VIEWER" | "EDITOR";
+
+export interface Collaborator {
+  id: string;
+  role: CollaboratorRole;
+  addedAt: string;
+  user: User;
+}
+
+export type NoteRole = "OWNER" | CollaboratorRole;
+
 export interface Note {
   id: string;
+  userId: string;
   title: string;
   content: string | null;
   color?: string | null;

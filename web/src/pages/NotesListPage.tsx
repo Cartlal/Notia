@@ -10,6 +10,7 @@ const viewTitles: Record<string, string> = {
   pinned: "Pinned",
   archived: "Archive",
   trash: "Trash",
+  shared: "Shared with me",
 };
 
 export default function NotesListPage({ view = "all" }: { view?: string }) {

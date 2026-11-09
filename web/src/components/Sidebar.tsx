@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { Home, Star, Pin, Archive, Trash2, Folder as FolderIcon, Tag as TagIcon, Plus, LogOut, Sun, Moon } from "lucide-react";
+import { Home, Star, Pin, Archive, Trash2, Folder as FolderIcon, Tag as TagIcon, Plus, LogOut, Sun, Moon, Users } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { useFolders, useTags } from "@/hooks/useNotes";
 import { useAuthStore } from "@/store/authStore";
@@ -10,6 +10,7 @@ const navItems = [
   { to: "/", icon: Home, label: "All notes" },
   { to: "/favorites", icon: Star, label: "Favorites" },
   { to: "/pinned", icon: Pin, label: "Pinned" },
+  { to: "/shared", icon: Users, label: "Shared with me" },
   { to: "/archived", icon: Archive, label: "Archive" },
   { to: "/trash", icon: Trash2, label: "Trash" },
 ];

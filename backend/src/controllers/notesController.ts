@@ -5,6 +5,7 @@ import { prisma } from "../lib/prisma";
 import { ApiError } from "../middleware/errorHandler";
 import { AuthedRequest } from "../middleware/auth";
 import { getIo } from "../realtime/io";
+import { resolveNoteAccess, requireWriteAccess } from "../services/noteAccess";
 
 const noteCreateSchema = z.object({
   title: z.string().max(300).optional(),
@@ -45,8 +46,23 @@ async function getOwnedNote(userId: string, noteId: string) {
   return note;
 }
 
+async function getNoteWithInclude(noteId: string) {
+  const note = await prisma.note.findUnique({ where: { id: noteId }, include: noteInclude });
+  if (!note) throw new ApiError(404, "note_not_found", "Note not found");
+  return note;
+}
+
 export async function listNotes(req: AuthedRequest, res: Response) {
   const { folderId, tagId, view, sort = "updatedAt", order = "desc" } = req.query as Record<string, string>;
+
+  if (view === "shared") {
+    const notes = await prisma.note.findMany({
+      where: { isTrashed: false, collaborators: { some: { userId: req.userId! } } },
+      include: noteInclude,
+      orderBy: { updatedAt: "desc" },
+    });
+    return res.json({ notes: notes.map(serializeNote) });
+  }
 
   const where: any = { userId: req.userId! };
   if (view === "trash") where.isTrashed = true;
@@ -67,9 +83,10 @@ export async function listNotes(req: AuthedRequest, res: Response) {
 }
 
 export async function getNote(req: AuthedRequest, res: Response) {
-  const note = await getOwnedNote(req.userId!, req.params.id);
-  if (note.isProtected) return res.json({ note: { ...serializeNote(note), content: null, locked: true } });
-  res.json({ note: serializeNote(note) });
+  const { role } = await resolveNoteAccess(req.userId!, req.params.id);
+  const note = await getNoteWithInclude(req.params.id);
+  if (note.isProtected) return res.json({ note: { ...serializeNote(note), content: null, locked: true }, role });
+  res.json({ note: serializeNote(note), role });
 }
 
 export async function createNote(req: AuthedRequest, res: Response) {
@@ -92,7 +109,9 @@ export async function createNote(req: AuthedRequest, res: Response) {
 }
 
 export async function updateNote(req: AuthedRequest, res: Response) {
-  const existing = await getOwnedNote(req.userId!, req.params.id);
+  const { role } = await resolveNoteAccess(req.userId!, req.params.id);
+  requireWriteAccess(role);
+  const existing = await getNoteWithInclude(req.params.id);
   const body = noteUpdateSchema.parse(req.body);
 
   if (body.version !== undefined && body.version !== existing.version) {
