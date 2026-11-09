@@ -47,9 +47,29 @@ class NotesService {
     }
   }
 
-  Future<Attachment> uploadImage(String noteId, File file) async {
+  Future<Attachment> uploadImage(String noteId, File file) => uploadAttachment(noteId, file);
+
+  Future<Attachment> uploadAttachment(String noteId, File file) async {
     final form = FormData.fromMap({'file': await MultipartFile.fromFile(file.path)});
     final resp = await _dio.post('/notes/$noteId/attachments', data: form);
     return Attachment.fromJson(resp.data['attachment']);
   }
+
+  Future<List<Collaborator>> listCollaborators(String noteId) async {
+    final resp = await _dio.get('/notes/$noteId/collaborators');
+    return (resp.data['collaborators'] as List).map((c) => Collaborator.fromJson(c)).toList();
+  }
+
+  Future<Collaborator> addCollaborator(String noteId, String email, String role) async {
+    final resp = await _dio.post('/notes/$noteId/collaborators', data: {'email': email, 'role': role});
+    return Collaborator.fromJson(resp.data['collaborator']);
+  }
+
+  Future<Collaborator> updateCollaborator(String noteId, String collaboratorId, String role) async {
+    final resp = await _dio.patch('/notes/$noteId/collaborators/$collaboratorId', data: {'role': role});
+    return Collaborator.fromJson(resp.data['collaborator']);
+  }
+
+  Future<void> removeCollaborator(String noteId, String collaboratorId) =>
+      _dio.delete('/notes/$noteId/collaborators/$collaboratorId');
 }

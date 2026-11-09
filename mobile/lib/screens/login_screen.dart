@@ -91,15 +91,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 class _Logo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 56,
-      height: 56,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.brand700, width: 2),
-      ),
-      child: const Icon(Icons.description_outlined, color: AppColors.brand700),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: Image.asset('assets/logo.png', width: 56, height: 56, fit: BoxFit.cover),
     );
   }
 }

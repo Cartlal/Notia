@@ -9,6 +9,28 @@ class Tag {
       Tag(id: json['id'], name: json['name'], color: json['color']);
 }
 
+class CollaboratorUser {
+  final String id;
+  final String name;
+  final String email;
+
+  CollaboratorUser({required this.id, required this.name, required this.email});
+
+  factory CollaboratorUser.fromJson(Map<String, dynamic> json) =>
+      CollaboratorUser(id: json['id'], name: json['name'], email: json['email']);
+}
+
+class Collaborator {
+  final String id;
+  final String role; // 'VIEWER' | 'EDITOR'
+  final CollaboratorUser user;
+
+  Collaborator({required this.id, required this.role, required this.user});
+
+  factory Collaborator.fromJson(Map<String, dynamic> json) =>
+      Collaborator(id: json['id'], role: json['role'], user: CollaboratorUser.fromJson(json['user']));
+}
+
 class Attachment {
   final String id;
   final String fileName;
@@ -37,6 +59,7 @@ class Note {
   final String id;
   final String title;
   final String? content;
+  final String? contentJson;
   final String? color;
   final String type;
   final bool isPinned;
@@ -55,6 +78,7 @@ class Note {
     required this.id,
     required this.title,
     required this.content,
+    required this.contentJson,
     required this.color,
     required this.type,
     required this.isPinned,
@@ -74,6 +98,7 @@ class Note {
         id: id,
         title: title,
         content: content,
+        contentJson: contentJson,
         color: color,
         type: type,
         isPinned: isPinned,
@@ -93,6 +118,7 @@ class Note {
         id: json['id'],
         title: json['title'] ?? 'Untitled',
         content: json['content'],
+        contentJson: json['contentJson'],
         color: json['color'],
         type: json['type'] ?? 'STANDARD',
         isPinned: json['isPinned'] ?? false,
@@ -112,6 +138,7 @@ class Note {
         'id': id,
         'title': title,
         'content': content,
+        'contentJson': contentJson,
         'color': color,
         'type': type,
         'isPinned': isPinned,

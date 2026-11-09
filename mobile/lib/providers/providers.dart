@@ -1,7 +1,12 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/auth_service.dart';
 import '../services/notes_service.dart';
 import '../services/lock_service.dart';
+
+// Mirrors web's theme store: defaults to light (never follows the OS's
+// dark-mode preference — see main.dart), toggled explicitly by the user.
+final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.light);
 
 final authServiceProvider = Provider((ref) => AuthService());
 final notesServiceProvider = Provider((ref) => NotesService());

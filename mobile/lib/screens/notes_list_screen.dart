@@ -87,7 +87,7 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
 
     Widget buildSidebar({required bool closeDrawerOnSelect}) {
       return Container(
-        color: AppColors.bgSubtle,
+        color: Theme.of(context).canvasColor,
         child: _Sidebar(
           selected: _view,
           onSelect: (v) {
@@ -101,7 +101,6 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
     }
 
     return Scaffold(
-      backgroundColor: AppColors.bg,
       appBar: isWide
           ? null
           : AppBar(
@@ -131,7 +130,7 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
   }
 }
 
-class _Sidebar extends StatelessWidget {
+class _Sidebar extends ConsumerWidget {
   final String selected;
   final ValueChanged<String> onSelect;
   final VoidCallback onLogout;
@@ -140,7 +139,8 @@ class _Sidebar extends StatelessWidget {
   const _Sidebar({required this.selected, required this.onSelect, required this.onLogout, required this.onNewNote});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeModeProvider);
     return SafeArea(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -172,6 +172,23 @@ class _Sidebar extends StatelessWidget {
           const Spacer(),
           Divider(color: AppColors.border, height: 1),
           Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            child: ListTile(
+              dense: true,
+              leading: Icon(themeMode == ThemeMode.dark ? Icons.light_mode_outlined : Icons.dark_mode_outlined, size: 20),
+              title: const Text('Toggle theme', style: TextStyle(fontSize: 14)),
+              onTap: () => ref.read(themeModeProvider.notifier).state =
+                  themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+            child: Text(
+              ref.watch(authControllerProvider).valueOrNull?.name ?? '',
+              style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+            ),
+          ),
+          Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             child: ListTile(
               dense: true,
@@ -187,7 +204,7 @@ class _Sidebar extends StatelessWidget {
 }
 
 /// Matches web/src/components/Logo.tsx: a white rounded square with a black
-/// border and a document-shaped mark, not a Material icon on its own.
+/// Matches web/src/components/Logo.tsx, which renders the same asset.
 class _LogoBadge extends StatelessWidget {
   const _LogoBadge();
 
@@ -195,15 +212,9 @@ class _LogoBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Container(
-          width: 28,
-          height: 28,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppColors.brand700, width: 1.5),
-          ),
-          child: const Icon(Icons.description_outlined, size: 16, color: AppColors.brand700),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Image.asset('assets/logo.png', width: 28, height: 28, fit: BoxFit.cover),
         ),
         const SizedBox(width: 8),
         const Text('Notia', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 18)),

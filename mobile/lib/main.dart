@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_quill/flutter_quill.dart' show FlutterQuillLocalizations;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'providers/providers.dart';
 import 'theme/app_theme.dart';
@@ -9,21 +11,29 @@ void main() {
   runApp(const ProviderScope(child: NotiaApp()));
 }
 
-class NotiaApp extends StatelessWidget {
+class NotiaApp extends ConsumerWidget {
   const NotiaApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeModeProvider);
     return MaterialApp(
       title: 'Notia',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
-      // Without this, MaterialApp defaults to ThemeMode.system and follows
-      // the OS's dark-mode preference on first launch — same issue as the
-      // web app's theme store. Light is always the default; dark is opt-in
-      // once a toggle exists in this app too.
-      themeMode: ThemeMode.light,
+      // Never ThemeMode.system — defaults to light regardless of the OS's
+      // dark-mode preference (same rule as web's theme store), toggled only
+      // via the sidebar's "Toggle theme" control.
+      themeMode: themeMode,
+      // flutter_quill's toolbar (used by the note editor) requires its own
+      // localizations delegate to be registered, alongside the standard
+      // Material/Cupertino/Widgets ones it bundles via this list.
+      localizationsDelegates: const [
+        ...GlobalMaterialLocalizations.delegates,
+        FlutterQuillLocalizations.delegate,
+      ],
+      supportedLocales: FlutterQuillLocalizations.supportedLocales,
       home: const _AuthGate(),
     );
   }
