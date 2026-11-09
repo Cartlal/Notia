@@ -6,6 +6,7 @@ import DashboardLayout from "@/pages/DashboardLayout";
 import NotesListPage from "@/pages/NotesListPage";
 import NotePage from "@/pages/NotePage";
 import PublicNotePage from "@/pages/PublicNotePage";
+import SettingsPage from "@/pages/SettingsPage";
 import { RequireAuth } from "@/components/RequireAuth";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,7 @@ export default function App() {
               <Route path="/folders/:folderId" element={<NotesListPage view="all" />} />
               <Route path="/notes/:id" element={<NotePage />} />
             </Route>
+            <Route path="/settings" element={<SettingsPage />} />
           </Route>
         </Routes>
       </BrowserRouter>

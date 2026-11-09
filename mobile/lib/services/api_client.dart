@@ -1,12 +1,10 @@
-import 'dart:io' show Platform;
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-/// Change for a physical device / production backend. 10.0.2.2 is the
-/// Android emulator's alias for the host machine's localhost; Windows (and
-/// other desktop targets) run as a normal process on that same machine, so
-/// plain localhost reaches a backend started with `npm run dev` there.
-final String kApiBaseUrl = Platform.isAndroid ? 'http://10.0.2.2:4000' : 'http://localhost:4000';
+/// The deployed backend. Change to a local one (e.g. 'http://10.0.2.2:4000'
+/// on the Android emulator, 'http://localhost:4000' on Windows/desktop) to
+/// develop against `npm run dev` instead.
+const String kApiBaseUrl = 'https://notia.hirenarti.in';
 
 class ApiClient {
   ApiClient._internal() {

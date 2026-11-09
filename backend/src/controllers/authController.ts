@@ -126,3 +126,32 @@ export async function deleteAccount(req: AuthedRequest, res: Response) {
   res.clearCookie(REFRESH_COOKIE, { path: "/api/auth" });
   res.status(204).send();
 }
+
+const updateProfileSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+});
+
+export async function updateProfile(req: AuthedRequest, res: Response) {
+  const body = updateProfileSchema.parse(req.body);
+  const user = await prisma.user.update({ where: { id: req.userId! }, data: { name: body.name } });
+  res.json({ user: toSafeUser(user) });
+}
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(8, "Password must be at least 8 characters"),
+});
+
+export async function changePassword(req: AuthedRequest, res: Response) {
+  const { currentPassword, newPassword } = changePasswordSchema.parse(req.body);
+  const user = await prisma.user.findUnique({ where: { id: req.userId! } });
+  if (!user?.passwordHash) {
+    throw new ApiError(409, "no_password", "This account signs in with Google and has no password to change");
+  }
+  const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+  if (!valid) throw new ApiError(401, "invalid_credentials", "Current password is incorrect");
+
+  const passwordHash = await bcrypt.hash(newPassword, 12);
+  await prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
+  res.status(204).send();
+}

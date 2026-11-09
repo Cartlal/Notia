@@ -14,6 +14,8 @@ router.post("/google", authLimiter, asyncHandler(auth.googleLogin));
 router.post("/refresh", asyncHandler(auth.refresh));
 router.post("/logout", asyncHandler(auth.logout));
 router.get("/me", requireAuth, asyncHandler(auth.me));
+router.patch("/me", requireAuth, asyncHandler(auth.updateProfile));
 router.delete("/me", requireAuth, asyncHandler(auth.deleteAccount));
+router.post("/change-password", requireAuth, authLimiter, asyncHandler(auth.changePassword));
 
 export default router;

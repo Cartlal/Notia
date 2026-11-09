@@ -49,4 +49,17 @@ class AuthService {
     } catch (_) {}
     await ApiClient.instance.clearTokens();
   }
+
+  Future<AuthUser> updateProfile({required String name}) async {
+    final resp = await _dio.patch('/auth/me', data: {'name': name});
+    return AuthUser.fromJson(resp.data['user']);
+  }
+
+  Future<void> changePassword({required String currentPassword, required String newPassword}) =>
+      _dio.post('/auth/change-password', data: {'currentPassword': currentPassword, 'newPassword': newPassword});
+
+  Future<void> deleteAccount() async {
+    await _dio.delete('/auth/me');
+    await ApiClient.instance.clearTokens();
+  }
 }

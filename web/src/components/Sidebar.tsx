@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { Home, Star, Pin, Archive, Trash2, Folder as FolderIcon, Tag as TagIcon, Plus, LogOut, Sun, Moon, Users } from "lucide-react";
+import { Home, Star, Pin, Archive, Trash2, Folder as FolderIcon, Tag as TagIcon, Plus, LogOut, Sun, Moon, Users, Settings } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { useFolders, useTags } from "@/hooks/useNotes";
 import { useAuthStore } from "@/store/authStore";
@@ -87,9 +87,13 @@ export function Sidebar() {
         >
           {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />} Toggle theme
         </button>
-        <div className="flex items-center gap-2 px-2.5 py-2 text-xs" style={{ color: "var(--color-text-muted)" }}>
-          {user?.name}
-        </div>
+        <button
+          onClick={() => navigate("/settings")}
+          className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 hover-surface text-left"
+        >
+          <Settings size={16} className="shrink-0" />
+          <span className="truncate text-xs" style={{ color: "var(--color-text-muted)" }}>{user?.name}</span>
+        </button>
         <button onClick={logout} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 hover-surface text-red-500">
           <LogOut size={16} /> Log out
         </button>

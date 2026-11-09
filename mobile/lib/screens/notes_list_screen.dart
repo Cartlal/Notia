@@ -6,6 +6,7 @@ import '../providers/notes_providers.dart';
 import '../theme/app_theme.dart';
 import 'note_editor_screen.dart';
 import 'login_screen.dart';
+import 'profile_screen.dart';
 
 class NotesListScreen extends ConsumerStatefulWidget {
   const NotesListScreen({super.key});
@@ -182,10 +183,16 @@ class _Sidebar extends ConsumerWidget {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
-            child: Text(
-              ref.watch(authControllerProvider).valueOrNull?.name ?? '',
-              style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            child: ListTile(
+              dense: true,
+              leading: const Icon(Icons.settings_outlined, size: 20),
+              title: Text(
+                ref.watch(authControllerProvider).valueOrNull?.name ?? '',
+                style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                overflow: TextOverflow.ellipsis,
+              ),
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ProfileScreen())),
             ),
           ),
           Padding(
