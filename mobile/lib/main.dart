@@ -19,6 +19,11 @@ class NotiaApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
+      // Without this, MaterialApp defaults to ThemeMode.system and follows
+      // the OS's dark-mode preference on first launch — same issue as the
+      // web app's theme store. Light is always the default; dark is opt-in
+      // once a toggle exists in this app too.
+      themeMode: ThemeMode.light,
       home: const _AuthGate(),
     );
   }
