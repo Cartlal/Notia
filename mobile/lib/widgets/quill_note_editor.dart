@@ -14,7 +14,10 @@ enum PaperStyle { none, ruled, grid }
 /// loading falls back to plain text (stripped of HTML tags) when there's
 /// no Delta to read, which keeps the words intact even if bold/headings
 /// made on web don't carry over as Quill formatting.
-quill.Document documentFromNote({required String? contentJson, required String? htmlContent}) {
+quill.Document documentFromNote({
+  required String? contentJson,
+  required String? htmlContent,
+}) {
   if (contentJson != null && contentJson.isNotEmpty) {
     try {
       return quill.Document.fromJson(jsonDecode(contentJson) as List);
@@ -75,46 +78,60 @@ class _QuillNoteEditorState extends State<QuillNoteEditor> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (widget.editable) ...[
-          quill.QuillSimpleToolbar(
-            controller: widget.controller,
-            config: const quill.QuillSimpleToolbarConfig(
-              multiRowsDisplay: true,
-              showFontFamily: true,
-              showFontSize: true,
-              showBoldButton: true,
-              showItalicButton: true,
-              showSmallButton: false,
-              showUnderLineButton: true,
-              showStrikeThrough: true,
-              showInlineCode: true,
-              // Only "highlight" (background), matching the web editor —
-              // arbitrary text color isn't a web feature.
-              showColorButton: false,
-              showBackgroundColorButton: true,
-              showClearFormat: true,
-              showAlignmentButtons: false,
-              showHeaderStyle: true,
-              showListNumbers: true,
-              showListBullets: true,
-              showListCheck: true,
-              showCodeBlock: true,
-              showQuote: true,
-              showIndent: false,
-              showLink: true,
-              showUndo: true,
-              showRedo: true,
-              showSearchButton: false,
-              showSubscript: false,
-              showSuperscript: false,
+          // A wrapping multi-row toolbar (flutter_quill's default) eats a
+          // third of the screen on phone widths — single row, horizontally
+          // scrollable instead, the same pattern Notion/Google Docs use on
+          // mobile.
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: quill.QuillSimpleToolbar(
+              controller: widget.controller,
+              config: const quill.QuillSimpleToolbarConfig(
+                multiRowsDisplay: false,
+                showFontFamily: true,
+                showFontSize: true,
+                showBoldButton: true,
+                showItalicButton: true,
+                showSmallButton: false,
+                showUnderLineButton: true,
+                showStrikeThrough: true,
+                showInlineCode: true,
+                // Only "highlight" (background), matching the web editor —
+                // arbitrary text color isn't a web feature.
+                showColorButton: false,
+                showBackgroundColorButton: true,
+                showClearFormat: true,
+                showAlignmentButtons: false,
+                showHeaderStyle: true,
+                showListNumbers: true,
+                showListBullets: true,
+                showListCheck: true,
+                showCodeBlock: true,
+                showQuote: true,
+                showIndent: false,
+                showLink: true,
+                showUndo: true,
+                showRedo: true,
+                showSearchButton: false,
+                showSubscript: false,
+                showSuperscript: false,
+              ),
             ),
           ),
-          if (widget.onPaperStyleChanged != null) _PaperStyleBar(value: widget.paperStyle, onChanged: widget.onPaperStyleChanged!),
+          if (widget.onPaperStyleChanged != null)
+            _PaperStyleBar(
+              value: widget.paperStyle,
+              onChanged: widget.onPaperStyleChanged!,
+            ),
           const Divider(height: 1, color: AppColors.border),
         ],
         Expanded(
           child: _PaperBackground(
             style: widget.paperStyle,
-            child: Padding(padding: const EdgeInsets.symmetric(horizontal: 4), child: editor),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: editor,
+            ),
           ),
         ),
       ],
@@ -133,8 +150,14 @@ class _PaperStyleBar extends StatelessWidget {
       final selected = value == s;
       return IconButton(
         tooltip: tooltip,
-        icon: Icon(icon, size: 18, color: selected ? AppColors.brand700 : AppColors.textMuted),
-        style: IconButton.styleFrom(backgroundColor: selected ? AppColors.brand100 : null),
+        icon: Icon(
+          icon,
+          size: 18,
+          color: selected ? AppColors.brand700 : AppColors.textMuted,
+        ),
+        style: IconButton.styleFrom(
+          backgroundColor: selected ? AppColors.brand100 : null,
+        ),
         onPressed: () => onChanged(s),
       );
     }
@@ -164,7 +187,10 @@ class _PaperBackground extends StatelessWidget {
     if (style == PaperStyle.none) return child;
     return CustomPaint(
       painter: _PaperPainter(style),
-      child: Padding(padding: EdgeInsets.only(left: style == PaperStyle.ruled ? 16 : 0), child: child),
+      child: Padding(
+        padding: EdgeInsets.only(left: style == PaperStyle.ruled ? 16 : 0),
+        child: child,
+      ),
     );
   }
 }
@@ -198,5 +224,6 @@ class _PaperPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _PaperPainter oldDelegate) => oldDelegate.style != style;
+  bool shouldRepaint(covariant _PaperPainter oldDelegate) =>
+      oldDelegate.style != style;
 }
