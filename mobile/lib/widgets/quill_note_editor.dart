@@ -78,44 +78,45 @@ class _QuillNoteEditorState extends State<QuillNoteEditor> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (widget.editable) ...[
-          // A wrapping multi-row toolbar (flutter_quill's default) eats a
-          // third of the screen on phone widths — single row, horizontally
-          // scrollable instead, the same pattern Notion/Google Docs use on
-          // mobile.
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: quill.QuillSimpleToolbar(
-              controller: widget.controller,
-              config: const quill.QuillSimpleToolbarConfig(
-                multiRowsDisplay: false,
-                showFontFamily: true,
-                showFontSize: true,
-                showBoldButton: true,
-                showItalicButton: true,
-                showSmallButton: false,
-                showUnderLineButton: true,
-                showStrikeThrough: true,
-                showInlineCode: true,
-                // Only "highlight" (background), matching the web editor —
-                // arbitrary text color isn't a web feature.
-                showColorButton: false,
-                showBackgroundColorButton: true,
-                showClearFormat: true,
-                showAlignmentButtons: false,
-                showHeaderStyle: true,
-                showListNumbers: true,
-                showListBullets: true,
-                showListCheck: true,
-                showCodeBlock: true,
-                showQuote: true,
-                showIndent: false,
-                showLink: true,
-                showUndo: true,
-                showRedo: true,
-                showSearchButton: false,
-                showSubscript: false,
-                showSuperscript: false,
-              ),
+          // multiRowsDisplay: false already gives this its own internal
+          // horizontal-scroll-with-arrows layout (QuillToolbarArrowIndicated
+          // ButtonList) — a single row, not the default wrapping multi-row
+          // toolbar that ate a third of the screen on phone widths. Do NOT
+          // wrap this in another scrollable: nesting two scrollables here
+          // starves the inner one of bounded width and crashes
+          // (`ScrollPosition.minScrollExtent` null-check failure) once its
+          // deferred scroll-position check fires.
+          quill.QuillSimpleToolbar(
+            controller: widget.controller,
+            config: const quill.QuillSimpleToolbarConfig(
+              multiRowsDisplay: false,
+              showFontFamily: true,
+              showFontSize: true,
+              showBoldButton: true,
+              showItalicButton: true,
+              showSmallButton: false,
+              showUnderLineButton: true,
+              showStrikeThrough: true,
+              showInlineCode: true,
+              // Only "highlight" (background), matching the web editor —
+              // arbitrary text color isn't a web feature.
+              showColorButton: false,
+              showBackgroundColorButton: true,
+              showClearFormat: true,
+              showAlignmentButtons: false,
+              showHeaderStyle: true,
+              showListNumbers: true,
+              showListBullets: true,
+              showListCheck: true,
+              showCodeBlock: true,
+              showQuote: true,
+              showIndent: false,
+              showLink: true,
+              showUndo: true,
+              showRedo: true,
+              showSearchButton: false,
+              showSubscript: false,
+              showSuperscript: false,
             ),
           ),
           if (widget.onPaperStyleChanged != null)
