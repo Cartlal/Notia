@@ -25,8 +25,8 @@ export default function App() {
               <Route path="/archived" element={<NotesListPage view="archived" />} />
               <Route path="/trash" element={<NotesListPage view="trash" />} />
               <Route path="/folders/:folderId" element={<NotesListPage view="all" />} />
+              <Route path="/notes/:id" element={<NotePage />} />
             </Route>
-            <Route path="/notes/:id" element={<NotePage />} />
           </Route>
         </Routes>
       </BrowserRouter>
