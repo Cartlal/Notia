@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 
 /// Returns the entered PIN, or null if the user cancelled.
 Future<String?> showPinDialog(BuildContext context, {required String title, required String message}) {
@@ -11,7 +12,7 @@ Future<String?> showPinDialog(BuildContext context, {required String title, requ
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(message, style: TextStyle(color: Colors.grey.shade600)),
+          Text(message, style: const TextStyle(color: AppColors.textMuted)),
           const SizedBox(height: 12),
           TextField(
             controller: controller,

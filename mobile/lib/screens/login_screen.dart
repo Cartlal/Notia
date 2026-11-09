@@ -49,7 +49,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 const SizedBox(height: 24),
                 Text('Welcome back', style: Theme.of(context).textTheme.headlineSmall),
                 const SizedBox(height: 4),
-                Text('Sign in to keep writing', style: TextStyle(color: Colors.grey.shade600)),
+                const Text('Sign in to keep writing', style: TextStyle(color: AppColors.textMuted)),
                 const SizedBox(height: 24),
                 TextField(
                   controller: _email,
@@ -97,9 +97,9 @@ class _Logo extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.brand600, width: 2),
+        border: Border.all(color: AppColors.brand700, width: 2),
       ),
-      child: Icon(Icons.description_outlined, color: AppColors.brand600),
+      child: const Icon(Icons.description_outlined, color: AppColors.brand700),
     );
   }
 }

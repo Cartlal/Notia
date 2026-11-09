@@ -35,6 +35,9 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
 
+  # Inter, to match the web app's typography
+  google_fonts: ^6.2.1
+
   # State management
   flutter_riverpod: ^2.6.1
 

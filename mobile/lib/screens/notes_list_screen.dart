@@ -32,15 +32,11 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
     final notesAsync = ref.watch(notesListProvider(_view));
     final isWide = MediaQuery.of(context).size.width >= 760;
 
-    final sidebar = _Sidebar(
-      selected: _view,
-      onSelect: (v) => setState(() => _view = v),
-      onLogout: () async {
-        await ref.read(authControllerProvider.notifier).logout();
-        if (!mounted) return;
-        Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const LoginScreen()), (_) => false);
-      },
-    );
+    Future<void> logout() async {
+      await ref.read(authControllerProvider.notifier).logout();
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const LoginScreen()), (_) => false);
+    }
 
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -84,27 +80,49 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
       ],
     );
 
+    Future<void> createNote() async {
+      await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NoteEditorScreen(noteId: null)));
+      ref.invalidate(notesListProvider(_view));
+    }
+
+    Widget buildSidebar({required bool closeDrawerOnSelect}) {
+      return Container(
+        color: AppColors.bgSubtle,
+        child: _Sidebar(
+          selected: _view,
+          onSelect: (v) {
+            setState(() => _view = v);
+            if (closeDrawerOnSelect) Navigator.of(context).pop();
+          },
+          onLogout: logout,
+          onNewNote: createNote,
+        ),
+      );
+    }
+
     return Scaffold(
+      backgroundColor: AppColors.bg,
       appBar: isWide
           ? null
           : AppBar(
               title: const Text('Notia'),
-              actions: [IconButton(icon: const Icon(Icons.logout), onPressed: sidebar.onLogout)],
+              actions: [IconButton(icon: const Icon(Icons.logout), onPressed: logout)],
             ),
-      drawer: isWide ? null : Drawer(child: sidebar),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NoteEditorScreen(noteId: null)));
-          ref.invalidate(notesListProvider(_view));
-        },
-        icon: const Icon(Icons.add),
-        label: const Text('New note'),
-      ),
+      drawer: isWide ? null : Drawer(child: buildSidebar(closeDrawerOnSelect: true)),
+      // On a wide (desktop/tablet) layout the sidebar already has its own
+      // "New note" button, matching the web app; the FAB is mobile-only.
+      floatingActionButton: isWide
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: createNote,
+              icon: const Icon(Icons.add),
+              label: const Text('New note'),
+            ),
       body: isWide
           ? Row(
               children: [
-                SizedBox(width: 260, child: sidebar),
-                const VerticalDivider(width: 1),
+                SizedBox(width: 260, child: buildSidebar(closeDrawerOnSelect: false)),
+                VerticalDivider(width: 1, color: AppColors.border),
                 Expanded(child: content),
               ],
             )
@@ -117,8 +135,9 @@ class _Sidebar extends StatelessWidget {
   final String selected;
   final ValueChanged<String> onSelect;
   final VoidCallback onLogout;
+  final VoidCallback onNewNote;
 
-  const _Sidebar({required this.selected, required this.onSelect, required this.onLogout});
+  const _Sidebar({required this.selected, required this.onSelect, required this.onLogout, required this.onNewNote});
 
   @override
   Widget build(BuildContext context) {
@@ -127,28 +146,68 @@ class _Sidebar extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Padding(
-            padding: EdgeInsets.all(16),
-            child: Row(children: [
-              Icon(Icons.description_outlined, color: AppColors.brand600),
-              SizedBox(width: 8),
-              Text('Notia', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
-            ]),
+            padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: _LogoBadge(),
           ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+            child: ElevatedButton.icon(
+              onPressed: onNewNote,
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('New note'),
+            ),
+          ),
+          const SizedBox(height: 8),
           for (final (key, label, icon) in _views)
-            ListTile(
-              leading: Icon(icon, size: 20),
-              title: Text(label),
-              selected: selected == key,
-              onTap: () => onSelect(key),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              child: ListTile(
+                dense: true,
+                leading: Icon(icon, size: 20),
+                title: Text(label, style: const TextStyle(fontSize: 14)),
+                selected: selected == key,
+                onTap: () => onSelect(key),
+              ),
             ),
           const Spacer(),
-          ListTile(
-            leading: const Icon(Icons.logout, size: 20),
-            title: const Text('Log out'),
-            onTap: onLogout,
+          Divider(color: AppColors.border, height: 1),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: ListTile(
+              dense: true,
+              leading: const Icon(Icons.logout, size: 20, color: Color(0xFFDC2626)),
+              title: const Text('Log out', style: TextStyle(fontSize: 14, color: Color(0xFFDC2626))),
+              onTap: onLogout,
+            ),
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Matches web/src/components/Logo.tsx: a white rounded square with a black
+/// border and a document-shaped mark, not a Material icon on its own.
+class _LogoBadge extends StatelessWidget {
+  const _LogoBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.brand700, width: 1.5),
+          ),
+          child: const Icon(Icons.description_outlined, size: 16, color: AppColors.brand700),
+        ),
+        const SizedBox(width: 8),
+        const Text('Notia', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 18)),
+      ],
     );
   }
 }
@@ -178,7 +237,7 @@ class _NoteCard extends StatelessWidget {
                   note.isProtected ? 'Protected note' : _plainText(note.content),
                   maxLines: 4,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                  style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
                 ),
               ),
             ],
